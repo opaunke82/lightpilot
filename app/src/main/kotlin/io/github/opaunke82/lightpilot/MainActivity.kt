@@ -103,6 +103,8 @@ class MainActivity : ComponentActivity() {
                         simulatePause = { manual -> ext?.engine?.simulatePause(manual) },
                         simulateResume = { ext?.engine?.simulateResume() },
                         manualCycle = { ext?.engine?.manualCycle() },
+                        setManual = { ext?.engine?.setManual(it) },
+                        simulateZone = { ext?.engine?.simulateZone(it) },
                         frontCycle = { ext?.engine?.frontCycle() },
                         exportLog = {
                             val file = EventLog.export(applicationContext)

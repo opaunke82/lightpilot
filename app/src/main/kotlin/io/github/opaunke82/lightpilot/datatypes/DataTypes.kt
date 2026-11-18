@@ -15,7 +15,7 @@ import io.github.opaunke82.lightpilot.core.ManualMode
 import io.github.opaunke82.lightpilot.core.RidePhase
 import io.github.opaunke82.lightpilot.core.Zone
 import io.github.opaunke82.lightpilot.data.LightRole
-import io.github.opaunke82.lightpilot.data.modeDisplayName
+import io.github.opaunke82.lightpilot.batteryText
 import io.github.opaunke82.lightpilot.engine.EngineStatus
 import io.hammerhead.karooext.extension.DataTypeImpl
 import io.hammerhead.karooext.internal.Emitter
@@ -83,30 +83,46 @@ class StatusDataType(private val ext: LightPilotExtension) :
     private fun render(context: Context, s: EngineStatus): RemoteViews {
         val views = RemoteViews(context.packageName, R.layout.field_view)
         val rear = s.lights.firstOrNull { it.setup.role == LightRole.REAR }
-        val top = if (s.phase == RidePhase.IDLE && !s.simulation) "LightPilot" else "${manualLabel(s.manual)} · ${zoneLabel(s.zone)}"
+        val idle = s.phase == RidePhase.IDLE && !s.simulation
         val radar = when {
             s.radarWarning -> "FAHRZEUG"
             !s.radarSeen -> "kein Radar"
             s.radarStale -> "Radar still"
-            else -> "frei"
+            else -> "Radar frei"
         }
-        val rearText = rear?.let {
-            val mode = modeDisplayName(it.setup.protocol, it.setup.deviceId, it.desired)
-            val mark = if (!it.connected) " (getrennt)" else ""
-            "$mode$mark"
-        } ?: "kein Rücklicht"
-        val battery = rear?.batteryPct?.let { " · Akku $it %" } ?: ""
-        views.setTextViewText(R.id.field_title, top)
-        views.setTextViewText(R.id.field_main, rearText)
-        views.setTextViewText(R.id.field_sub, "Radar: $radar$battery")
+        val rearText = when {
+            rear == null -> "kein Rücklicht"
+            !rear.connected -> "Rück getrennt"
+            else -> "Rück: ${shortModeName(rear.desired)}"
+        }
+        val battery = rear?.let { batteryText(it.setup.protocol, it.batteryPct) }
+        // Title: day/night and radar. Main line: the manual setting, i.e. what a tap changes,
+        // so every tap is visible even if the light itself stays the same (e.g. by day).
+        views.setTextViewText(R.id.field_title, if (idle) "LightPilot" else "${zoneLabel(s.zone)} · $radar")
+        views.setTextViewText(R.id.field_main, if (idle) "keine Fahrt" else manualLabel(s.manual))
+        views.setTextViewText(R.id.field_sub, listOfNotNull(rearText, battery).joinToString(" · "))
         views.setInt(R.id.field_root, "setBackgroundColor", if (s.radarWarning) RED else Color.TRANSPARENT)
         views.setTextColor(R.id.field_sub, if (s.radarWarning) Color.WHITE else GREY)
+        views.setTextColor(R.id.field_title, if (s.radarWarning) Color.WHITE else GREY)
         // Taps only during a ride, so the Karoo page editor keeps all gestures otherwise.
         if (ext.isRideActive || s.simulation) {
             views.setOnClickPendingIntent(R.id.field_root, tapIntent(context, ACTION_MANUAL_CYCLE, 0))
         }
         return views
     }
+}
+
+/** Short mode names for the small data fields. */
+fun shortModeName(mode: String?): String = when {
+    mode == null -> "–"
+    mode == "OFF" -> "aus"
+    mode == "STEADY4" -> "hell"
+    mode == "STEADY5" -> "gedimmt"
+    mode == "SLOW_FLASH" -> "Night Flash"
+    mode == "FAST_FLASH" -> "Day Flash"
+    mode.startsWith("STEADY_") -> mode.removePrefix("STEADY_") + " %"
+    mode.startsWith("FLASH_") -> "Blinken " + mode.removePrefix("FLASH_") + " %"
+    else -> mode
 }
 
 /** Front field (N5): mode of the front light. Tap cycles its brightness. */
@@ -137,13 +153,10 @@ class FrontLightDataType(private val ext: LightPilotExtension) :
                     views.setTextViewText(R.id.field_main, "nicht eingerichtet")
                     views.setTextViewText(R.id.field_sub, "")
                 } else {
-                    views.setTextViewText(
-                        R.id.field_main,
-                        modeDisplayName(front.setup.protocol, front.setup.deviceId, front.desired),
-                    )
-                    val state = if (front.connected) "verbunden" else "getrennt"
-                    val battery = front.batteryPct?.let { " · Akku $it %" } ?: ""
-                    views.setTextViewText(R.id.field_sub, "$state$battery")
+                    views.setTextViewText(R.id.field_main, shortModeName(front.desired))
+                    val state = if (front.connected) "Tippen: nächste Stufe" else "getrennt"
+                    val battery = batteryText(front.setup.protocol, front.batteryPct)
+                    views.setTextViewText(R.id.field_sub, listOfNotNull(state, battery).joinToString(" · "))
                 }
                 views.setTextColor(R.id.field_sub, GREY)
                 if (ext.isRideActive || s.simulation) {
@@ -164,5 +177,6 @@ class TapReceiver : BroadcastReceiver() {
             ACTION_MANUAL_CYCLE -> engine.manualCycle()
             ACTION_FRONT_CYCLE -> engine.frontCycle()
         }
+        LightPilotExtension.getInstance()?.tapFeedback()
     }
 }

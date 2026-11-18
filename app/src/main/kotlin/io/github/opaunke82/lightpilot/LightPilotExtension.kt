@@ -53,6 +53,33 @@ data class DiscoveredLight(
     val connectionState: String? = null,
 )
 
+/**
+ * ANT+ lights only report a battery class (NEW/GOOD/OK/LOW/CRITICAL), no percentage.
+ * It is mapped to a percentage for the saver threshold and shown as a word.
+ */
+fun batteryPercentFor(status: String?): Int? = when (status) {
+    "NEW" -> 100
+    "GOOD" -> 80
+    "OK" -> 50
+    "LOW" -> 20
+    "CRITICAL" -> 5
+    else -> null
+}
+
+fun batteryText(protocol: LightProtocol, pct: Int?): String? = pct?.let {
+    if (protocol == LightProtocol.BLE) {
+        "Akku $it %"
+    } else {
+        "Akku " + when {
+            it >= 100 -> "neu"
+            it >= 80 -> "gut"
+            it >= 50 -> "ok"
+            it >= 20 -> "niedrig"
+            else -> "kritisch"
+        }
+    }
+}
+
 /** Text for the light list and dialog. */
 fun DiscoveredLight.connectionLabel(): String = when {
     protocol == LightProtocol.BLE -> if (connected) "verbunden" else "nicht verbunden"
@@ -317,17 +344,26 @@ class LightPilotExtension : KarooExtension(EXTENSION_ID, BuildConfig.VERSION_NAM
                 parts.size >= 3 && parts[1].toIntOrNull() == DEVICE_TYPE_BIKE_LIGHT
             }
             _antLights.value = lights.map { device ->
-                val battery = when (device.details?.lastBattery?.name) {
-                    "NEW", "GOOD" -> 80
-                    "OK" -> 50
-                    "LOW" -> 20
-                    "CRITICAL" -> 5
-                    else -> null
+                // A radar with a built-in light shows up twice: as radar and as light,
+                // with the same serial number. The Karoo shows the radar's name
+                // ("Radar 126742"); the light entry carries a generic, badly translated
+                // name ("Leicht 126742"). Use the sibling's name and battery where present.
+                val serial = device.id.split("-").getOrNull(2)
+                val sibling = saved.devices.firstOrNull { other ->
+                    other.id != device.id && serial != null && other.id.split("-").getOrNull(2) == serial
                 }
+                val status = device.details?.lastBattery ?: sibling?.details?.lastBattery
+                val battery = batteryPercentFor(status?.name)
                 engine.onBattery(device.id, battery)
+                if (_antLights.value.none { it.id == device.id }) {
+                    Timber.d(
+                        "$TAG: ANT+ light ${device.id} '${device.name}', sibling=${sibling?.id} '${sibling?.name}', " +
+                            "battery=${status?.name}",
+                    )
+                }
                 DiscoveredLight(
                     id = device.id,
-                    name = device.name,
+                    name = sibling?.name ?: device.name,
                     manufacturer = device.details?.manufacturer,
                     connected = isAntConnected(
                         device.id,
@@ -343,6 +379,11 @@ class LightPilotExtension : KarooExtension(EXTENSION_ID, BuildConfig.VERSION_NAM
                 lightControl.registerForLightParameters(device.id)
             }
         }
+    }
+
+    /** Short beep as feedback for a data field tap. */
+    fun tapFeedback() {
+        karooSystem.dispatch(PlayBeepPattern(listOf(PlayBeepPattern.Tone(frequency = 1318, durationMs = 60))))
     }
 
     // ---- BLE (KarooFirefly) -------------------------------------------------------------

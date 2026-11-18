@@ -52,6 +52,10 @@ data class EngineStatus(
     val radarSeen: Boolean = false,
     val radarStale: Boolean = true,
     val simulation: Boolean = false,
+    /** Zone forced in the simulation, null = real day/night. */
+    val simZone: Zone? = null,
+    /** Seconds until a long auto-pause switches the lights off, null if not auto-paused. */
+    val autoPauseOffInSec: Long? = null,
     val lights: List<LightStatus> = emptyList(),
 )
 
@@ -85,6 +89,10 @@ class LightPilotEngine(
     private var simRide = false
     private var simulation = false
     private var simVehicleUntilMs = 0L
+    private var simZone: Zone? = null
+
+    /** Real zone, or the one forced in the simulation. */
+    private fun zone(): Zone = if (simulation) simZone ?: zoneProvider() else zoneProvider()
 
     private val _status = MutableStateFlow(EngineStatus())
     val status: StateFlow<EngineStatus> = _status
@@ -134,7 +142,7 @@ class LightPilotEngine(
             rideEndedAtMs = null
             if (wasIdle) {
                 // Fresh ride: start with the current zone and resend everything.
-                apply(BrainEvent.ZoneChanged(zoneProvider()))
+                apply(BrainEvent.ZoneChanged(zone()))
                 links.clear()
             }
         }
@@ -171,6 +179,7 @@ class LightPilotEngine(
     fun setSimulation(enabled: Boolean) = post {
         simulation = enabled
         simVehicleUntilMs = 0
+        simZone = null
         if (!enabled && simRide) {
             simRide = false
             setPhase(RidePhase.IDLE)
@@ -189,6 +198,20 @@ class LightPilotEngine(
         if (!simulation) return@post
         simVehicleUntilMs = now() + seconds * 1_000L
         Timber.d("$TAG: simulated vehicle for $seconds s")
+    }
+
+    /** Forces day or night in the simulation; null = real day/night. */
+    fun simulateZone(zone: Zone?) = post {
+        if (!simulation) return@post
+        simZone = zone
+        Timber.d("$TAG: simulated zone=${zone ?: "real"}")
+        evaluate()
+    }
+
+    /** Sets the manual mode directly (simulation page), instead of cycling. */
+    fun setManual(mode: ManualMode) = post {
+        apply(BrainEvent.ManualSet(mode))
+        evaluate()
     }
 
     fun simulatePause(manual: Boolean) = post {
@@ -231,7 +254,7 @@ class LightPilotEngine(
             apply(BrainEvent.RadarSample(if (t < simVehicleUntilMs) 2 else 0, t))
         }
         if (brain.phase != RidePhase.IDLE) {
-            val zone = zoneProvider()
+            val zone = zone()
             if (zone != brain.zone) {
                 apply(BrainEvent.ZoneChanged(zone))
                 onZoneChange?.invoke(zone)
@@ -288,12 +311,16 @@ class LightPilotEngine(
         val core = settings.toCore()
         val next = EngineStatus(
             phase = brain.phase,
-            zone = if (brain.phase == RidePhase.IDLE) zoneProvider() else brain.zone,
+            zone = if (brain.phase == RidePhase.IDLE) zone() else brain.zone,
             manual = brain.manual,
             radarWarning = brain.radar.isWarning(t, core),
             radarSeen = brain.radar.lastSampleMs != null,
             radarStale = brain.radar.isStale(t, core),
             simulation = simulation,
+            simZone = if (simulation) simZone else null,
+            autoPauseOffInSec = brain.autoPauseSinceMs?.let { since ->
+                ((since + core.autoPauseOffDelayMs - t) / 1_000).coerceAtLeast(0)
+            },
             lights = lights,
         )
         if (next != _status.value) _status.value = next
