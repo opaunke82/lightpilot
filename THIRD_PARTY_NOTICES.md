@@ -6,8 +6,8 @@ Herkunftshinweis im Kopf.
 
 | Projekt | Übernommen | Lizenz |
 | --- | --- | --- |
-| [KarooFirefly](https://github.com/derstrassi/karoofirefly) | Lichtansteuerung über den Karoo-SensorService (`karoo/KarooLightControl.kt`), Magicshine-Bluetooth (`ble/`), Sonnenzeiten und Lichtsensor (`engine/TimeBasedController.kt`, `engine/AmbientLightSensor.kt`), Aufbau von Einstellungen und Build | MIT, Copyright (c) 2026 derstrassi |
-| [LightONKaroo](https://github.com/JaJaJim/LightONKaroo) | Tippen auf Datenfelder per PendingIntent | MIT, Copyright (c) 2026 Dennis Straßer (derstrassi) |
+| [KarooFirefly](https://github.com/derstrassi/karoofirefly) | Magicshine-Bluetooth (`ble/`), Sonnenzeiten und Lichtsensor (`engine/TimeBasedController.kt`, `engine/AmbientLightSensor.kt`), Aufbau von Einstellungen und Build | MIT, Copyright (c) 2026 derstrassi |
+| [LightONKaroo](https://github.com/JaJaJim/LightONKaroo) | Lichtansteuerung über den Karoo-SensorService (`karoo/KarooLightControl.kt`, `karoo/HammerheadDeviceParcel.kt`, `io/hammerhead/.../LightMode.kt`), Tippen auf Datenfelder per PendingIntent | MIT, Copyright (c) 2026 Dennis Straßer (derstrassi) |
 | [karoo-ext](https://github.com/hammerheadnav/karoo-ext) | SDK als Abhängigkeit, nicht im Repository | Apache 2.0, Copyright (c) 2025 SRAM LLC |
 
 ## Lizenztext KarooFirefly

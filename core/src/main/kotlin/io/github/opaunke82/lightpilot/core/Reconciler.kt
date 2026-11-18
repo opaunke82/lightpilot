@@ -34,6 +34,12 @@ object Reconciler {
     const val MAX_RETRIES = 2
     const val RETRY_RESET_MS = 10_000L
 
+    /**
+     * Reports this soon after a command are not taken as external changes:
+     * the Karoo sometimes reports the previous mode once more after a command.
+     */
+    const val EXTERNAL_GRACE_MS = 3_000L
+
     fun step(
         link: LinkState,
         desired: String?,
@@ -47,10 +53,12 @@ object Reconciler {
         }
 
         val observedChanged = observed != null && observed != link.lastObserved
+        val inGrace = link.lastSent != null && nowMs - link.sentAtMs < EXTERNAL_GRACE_MS
         val external = if (
             observedChanged &&
             link.lastObserved != null &&
-            observed != link.lastSent
+            observed != link.lastSent &&
+            !inGrace
         ) observed else null
         val withObserved = link.copy(lastObserved = observed ?: link.lastObserved)
 

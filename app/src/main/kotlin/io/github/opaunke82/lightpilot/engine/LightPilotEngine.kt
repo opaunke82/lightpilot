@@ -159,6 +159,9 @@ class LightPilotEngine(
         evaluate()
     }
 
+    /** Re-evaluates now, e.g. after a light connected; also keeps the status page current. */
+    fun refresh() = post { evaluate() }
+
     fun onBattery(lightId: String, pct: Int?) = post {
         if (brain.batteryPct[lightId] != pct) apply(BrainEvent.Battery(lightId, pct))
     }
