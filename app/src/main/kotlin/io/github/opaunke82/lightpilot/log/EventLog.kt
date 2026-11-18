@@ -32,6 +32,12 @@ object EventLog {
         _lastLines.value = lines.takeLast(30).reversed()
     }
 
+    @Synchronized
+    fun clear() {
+        lines.clear()
+        _lastLines.value = emptyList()
+    }
+
     /**
      * Writes the log to the app's external files folder, readable with
      * `adb pull /sdcard/Android/data/<package>/files/` on the computer.

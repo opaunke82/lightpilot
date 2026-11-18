@@ -20,6 +20,12 @@ class TimeBasedController {
     private var lastSunrise: Calendar? = null
     private var lastSunset: Calendar? = null
 
+    /** Where the position for the sun times comes from (shown in the app). */
+    enum class Source { GPS, LAST_KNOWN, ESTIMATED, NONE }
+
+    @Volatile var source: Source = Source.NONE
+        private set
+
     /** Offset in minutes to extend dusk/dawn zone before/after sun events. */
     var dawnOffsetMinutes: Int = 30
     var duskOffsetMinutes: Int = 30
@@ -30,6 +36,19 @@ class TimeBasedController {
     fun onLocationUpdate(latitude: Double, longitude: Double) {
         lastLatitude = latitude
         lastLongitude = longitude
+        source = Source.GPS
+        recalculate()
+    }
+
+    /**
+     * LightPilot: position to use until the first GPS fix (indoors, at the start of a ride).
+     * Without it the zone would stay DAY, even at night.
+     */
+    fun setFallbackLocation(latitude: Double, longitude: Double, estimated: Boolean) {
+        if (source == Source.GPS) return
+        lastLatitude = latitude
+        lastLongitude = longitude
+        source = if (estimated) Source.ESTIMATED else Source.LAST_KNOWN
         recalculate()
     }
 
@@ -54,6 +73,12 @@ class TimeBasedController {
     }
 
     fun getCurrentZone(): DayTimeZone {
+        // LightPilot: the sun times belong to one date; recalculate after midnight.
+        val today = Calendar.getInstance()
+        val calculated = lastSunrise
+        if (calculated != null && calculated.get(Calendar.DAY_OF_YEAR) != today.get(Calendar.DAY_OF_YEAR)) {
+            recalculate()
+        }
         val sunrise = lastSunrise ?: return DayTimeZone.DAY
         val sunset = lastSunset ?: return DayTimeZone.DAY
         val now = Calendar.getInstance()

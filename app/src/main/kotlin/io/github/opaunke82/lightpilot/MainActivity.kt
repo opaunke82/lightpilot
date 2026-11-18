@@ -20,6 +20,7 @@ import androidx.lifecycle.lifecycleScope
 import io.github.opaunke82.lightpilot.data.AppSettings
 import io.github.opaunke82.lightpilot.data.PreferencesRepository
 import io.github.opaunke82.lightpilot.engine.EngineStatus
+import io.github.opaunke82.lightpilot.engine.TimeBasedController
 import io.github.opaunke82.lightpilot.log.EventLog
 import io.github.opaunke82.lightpilot.ui.screens.SettingsActions
 import io.github.opaunke82.lightpilot.ui.screens.SettingsScreen
@@ -85,6 +86,12 @@ class MainActivity : ComponentActivity() {
                     currentLux = lux,
                     sunrise = ext?.timeController?.getSunriseTime(),
                     sunset = ext?.timeController?.getSunsetTime(),
+                    sunSource = when (ext?.timeController?.source) {
+                        TimeBasedController.Source.GPS -> "GPS"
+                        TimeBasedController.Source.LAST_KNOWN -> "letzte bekannte Position (noch kein GPS)"
+                        TimeBasedController.Source.ESTIMATED -> "geschätzt aus der Zeitzone (noch nie GPS)"
+                        else -> "keine"
+                    },
                     logLines = logLines,
                     exportInfo = exportInfo.value,
                     extensionReady = ext != null,
@@ -106,6 +113,14 @@ class MainActivity : ComponentActivity() {
                         setManual = { ext?.engine?.setManual(it) },
                         simulateZone = { ext?.engine?.simulateZone(it) },
                         frontCycle = { ext?.engine?.frontCycle() },
+                        factoryReset = {
+                            ext?.factoryReset()
+                            EventLog.clear()
+                            exportInfo.value = null
+                            Toast.makeText(this@MainActivity, "LightPilot zurückgesetzt", Toast.LENGTH_LONG).show()
+                            // Fresh start of the page; the extension service was reset in place.
+                            recreate()
+                        },
                         exportLog = {
                             val file = EventLog.export(applicationContext)
                             val text = file?.absolutePath ?: "Export fehlgeschlagen"

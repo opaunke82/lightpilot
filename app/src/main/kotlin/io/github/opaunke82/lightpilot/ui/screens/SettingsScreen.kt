@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -22,6 +23,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -66,6 +68,7 @@ class SettingsActions(
     val simulateZone: (Zone?) -> Unit,
     val frontCycle: () -> Unit,
     val exportLog: () -> Unit,
+    val factoryReset: () -> Unit,
 )
 
 fun reasonLabel(reason: Reason): String = when (reason) {
@@ -98,6 +101,7 @@ fun SettingsScreen(
     currentLux: Float,
     sunrise: Calendar?,
     sunset: Calendar?,
+    sunSource: String,
     logLines: List<String>,
     exportInfo: String?,
     extensionReady: Boolean,
@@ -142,7 +146,7 @@ fun SettingsScreen(
         }
 
         Section("Tag und Nacht") {
-            DayNightBlock(settings, currentLux, sunrise, sunset, actions.save)
+            DayNightBlock(settings, currentLux, sunrise, sunset, sunSource, actions.save)
         }
 
         Section("Radar") {
@@ -196,6 +200,10 @@ fun SettingsScreen(
             logLines.take(15).forEach {
                 Text(it, fontFamily = FontFamily.Monospace, fontSize = 10.sp, lineHeight = 12.sp)
             }
+        }
+
+        Section("Zurücksetzen") {
+            ResetBlock(actions.factoryReset)
         }
 
         Spacer(Modifier.height(16.dp))
@@ -333,15 +341,17 @@ private fun DayNightBlock(
     lux: Float,
     sunrise: Calendar?,
     sunset: Calendar?,
+    sunSource: String,
     save: (AppSettings) -> Unit,
 ) {
     fun shifted(c: Calendar?, minutes: Int): String = c?.let {
         val t = (it.clone() as Calendar).apply { add(Calendar.MINUTE, minutes) }
         "%02d:%02d".format(t.get(Calendar.HOUR_OF_DAY), t.get(Calendar.MINUTE))
-    } ?: "– (noch kein GPS)"
+    } ?: "–"
 
     SwitchRow("Nach Sonnenauf- und -untergang", settings.useTimeBased) { save(settings.copy(useTimeBased = it)) }
     if (settings.useTimeBased) {
+        Note("Position für die Sonnenzeiten: $sunSource")
         IntSlider("Tag beginnt ab Sonnenaufgang +", settings.dawnOffsetMinutes, -180..180, "min") {
             save(settings.copy(dawnOffsetMinutes = it))
         }
@@ -451,5 +461,32 @@ private fun TestBlock(status: EngineStatus, actions: SettingsActions) {
             ChoiceButton("Auto-Pause", status.phase == RidePhase.PAUSED_AUTO, riding, w) { actions.simulatePause(false) }
         }
         ChoiceButton("Weiterfahren", selected = false, enabled = paused, modifier = wide) { actions.simulateResume() }
+    }
+}
+
+@Composable
+private fun ResetBlock(onReset: () -> Unit) {
+    var confirm by remember { mutableStateOf(false) }
+    Note("Setzt LightPilot komplett auf den Auslieferungszustand: Lichter-Zuordnung, alle Einstellungen, gespeicherte Position und Protokoll.")
+    OutlinedButton(onClick = { confirm = true }, modifier = Modifier.fillMaxWidth()) {
+        Text("Werkseinstellungen", color = MaterialTheme.colorScheme.error)
+    }
+    if (confirm) {
+        AlertDialog(
+            onDismissRequest = { confirm = false },
+            title = { Text("Alles zurücksetzen?") },
+            text = {
+                Text(
+                    "Alle Lichter müssen danach neu eingerichtet werden. Die Kopplung der Lichter " +
+                        "im Karoo bleibt erhalten. Das lässt sich nicht rückgängig machen.",
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { confirm = false; onReset() }) {
+                    Text("Zurücksetzen", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = { TextButton(onClick = { confirm = false }) { Text("Abbrechen") } },
+        )
     }
 }
