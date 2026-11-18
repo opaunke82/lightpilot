@@ -37,8 +37,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.opaunke82.lightpilot.BuildConfig
 import io.github.opaunke82.lightpilot.DiscoveredLight
+import io.github.opaunke82.lightpilot.batteryText
 import io.github.opaunke82.lightpilot.connectionLabel
+import io.github.opaunke82.lightpilot.core.ManualMode
 import io.github.opaunke82.lightpilot.core.Reason
+import io.github.opaunke82.lightpilot.core.Zone
 import io.github.opaunke82.lightpilot.core.RidePhase
 import io.github.opaunke82.lightpilot.data.AppSettings
 import io.github.opaunke82.lightpilot.data.LightProtocol
@@ -59,6 +62,8 @@ class SettingsActions(
     val simulatePause: (Boolean) -> Unit,
     val simulateResume: () -> Unit,
     val manualCycle: () -> Unit,
+    val setManual: (ManualMode) -> Unit,
+    val simulateZone: (Zone?) -> Unit,
     val frontCycle: () -> Unit,
     val exportLog: () -> Unit,
 )
@@ -253,7 +258,12 @@ private fun StatusBlock(s: EngineStatus) {
         s.radarStale -> "keine aktuellen Daten"
         else -> "frei"
     }
-    Text("${phaseLabel(s.phase)} · ${zoneLabel(s.zone)} · ${manualLabel(s.manual)}" + if (s.simulation) " · SIMULATION" else "")
+    val pause = s.autoPauseOffInSec?.let { sec ->
+        if (sec > 0) " (Licht aus in %d:%02d)".format(sec / 60, sec % 60) else " (Licht aus)"
+    } ?: ""
+    val zone = zoneLabel(s.zone) + if (s.simZone != null) " (erzwungen)" else ""
+    Text("Fahrt: ${phaseLabel(s.phase)}$pause")
+    Text("Tag/Nacht: $zone · Steuerung: ${manualLabel(s.manual)}" + if (s.simulation) " · SIMULATION" else "")
     Text("Radar: $radar", color = if (s.radarWarning) Color(0xFFB71C1C) else Color.Unspecified)
     s.lights.forEach { l ->
         val mode = modeDisplayName(l.setup.protocol, l.setup.deviceId, l.desired)
@@ -296,7 +306,7 @@ private fun LightList(
             protocol,
             light.manufacturer,
             light.connectionLabel(),
-            light.batteryPercent?.let { "Akku $it %" },
+            batteryText(light.protocol, light.batteryPercent),
         ).joinToString(" · ")
         Row(
             modifier = Modifier
@@ -353,26 +363,93 @@ private fun DayNightBlock(
 }
 
 @Composable
+private fun ChoiceButton(text: String, selected: Boolean, enabled: Boolean = true, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    if (selected) {
+        Button(onClick = onClick, enabled = enabled, modifier = modifier) { Text(text, fontSize = 13.sp) }
+    } else {
+        OutlinedButton(onClick = onClick, enabled = enabled, modifier = modifier) { Text(text, fontSize = 13.sp) }
+    }
+}
+
+@Composable
+private fun SimGroup(title: String, hint: String, content: @Composable () -> Unit) {
+    Spacer(Modifier.height(10.dp))
+    Text(title, style = MaterialTheme.typography.labelLarge)
+    Note(hint)
+    content()
+}
+
+@Composable
 private fun TestBlock(status: EngineStatus, actions: SettingsActions) {
-    SwitchRow("Simulationsmodus (echtes Radar wird ignoriert)", status.simulation) { actions.setSimulation(it) }
+    SwitchRow("Simulationsmodus", status.simulation) { actions.setSimulation(it) }
     if (!status.simulation) {
-        Note("Im Simulationsmodus lässt sich die Logik am Tisch prüfen: Fahrt, Fahrzeug, Pausen.")
+        Note("Prüft die Logik am Tisch: Fahrt, Pausen, Tag/Nacht, Fahrzeug und Bedienung. Das echte Radar wird dabei ignoriert.")
         return
     }
     val riding = status.phase != RidePhase.IDLE
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Button(onClick = { actions.setSimulatedRide(!riding) }) {
-            Text(if (riding) "Fahrt beenden" else "Fahrt starten")
+    val wide = Modifier.fillMaxWidth()
+
+    // Live state, so the effect of every button is visible right here.
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.shapes.small)
+            .padding(8.dp),
+    ) {
+        StatusBlock(status)
+    }
+
+    SimGroup("1. Fahrt", "Ohne laufende Fahrt steuert LightPilot nichts.") {
+        ChoiceButton(if (riding) "Fahrt beenden" else "Fahrt starten", selected = riding, modifier = wide) {
+            actions.setSimulatedRide(!riding)
         }
-        Button(onClick = actions.simulateVehicle, enabled = riding) { Text("Fahrzeug 5 s") }
     }
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        OutlinedButton(onClick = { actions.simulatePause(true) }, enabled = riding) { Text("Pause-Taste") }
-        OutlinedButton(onClick = { actions.simulatePause(false) }, enabled = riding) { Text("Auto-Pause") }
-        OutlinedButton(onClick = actions.simulateResume, enabled = riding) { Text("Weiter") }
+
+    SimGroup("2. Tag oder Nacht", "Erzwingt die Tageszeit, um z. B. tagsüber den Nachtmodus zu prüfen.") {
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            val w = Modifier.weight(1f)
+            ChoiceButton("Echt", status.simZone == null, modifier = w) { actions.simulateZone(null) }
+            ChoiceButton("Tag", status.simZone == Zone.DAY, modifier = w) { actions.simulateZone(Zone.DAY) }
+            ChoiceButton("Nacht", status.simZone == Zone.NIGHT, modifier = w) { actions.simulateZone(Zone.NIGHT) }
+        }
     }
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        OutlinedButton(onClick = actions.manualCycle, enabled = riding) { Text("Datenfeld tippen") }
-        OutlinedButton(onClick = actions.frontCycle, enabled = riding) { Text("Frontfeld tippen") }
+
+    SimGroup("3. Radar", "Meldet 5 s lang ein Fahrzeug; danach läuft die Haltezeit.") {
+        ChoiceButton(
+            if (status.radarWarning) "Fahrzeug erkannt …" else "Fahrzeug 5 s",
+            selected = status.radarWarning, enabled = riding, modifier = wide,
+        ) { actions.simulateVehicle() }
+    }
+
+    SimGroup(
+        "4. Steuerung (wie Datenfeld)",
+        "Das Datenfeld schaltet reihum Automatik → An → Aus → Hart aus. Hier direkt wählbar. " +
+            "Ein Wechsel von Tag/Nacht setzt wieder auf Automatik.",
+    ) {
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            val w = Modifier.weight(1f)
+            ChoiceButton("Auto", status.manual == ManualMode.AUTO, riding, w) { actions.setManual(ManualMode.AUTO) }
+            ChoiceButton("An", status.manual == ManualMode.ON, riding, w) { actions.setManual(ManualMode.ON) }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            val w = Modifier.weight(1f)
+            ChoiceButton("Aus", status.manual == ManualMode.OFF, riding, w) { actions.setManual(ManualMode.OFF) }
+            ChoiceButton("Hart aus", status.manual == ManualMode.HARD_OFF, riding, w) { actions.setManual(ManualMode.HARD_OFF) }
+        }
+        ChoiceButton("Frontlicht: nächste Stufe", selected = false, enabled = riding, modifier = wide) { actions.frontCycle() }
+    }
+
+    SimGroup(
+        "5. Pause",
+        "Pause-Taste: Licht und Radar-Warnung sofort aus. Auto-Pause: erst nach der eingestellten Zeit " +
+            "(Abschnitt „Pause und Fahrtende“), Countdown oben im Status.",
+    ) {
+        val paused = status.phase == RidePhase.PAUSED_MANUAL || status.phase == RidePhase.PAUSED_AUTO
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            val w = Modifier.weight(1f)
+            ChoiceButton("Pause-Taste", status.phase == RidePhase.PAUSED_MANUAL, riding, w) { actions.simulatePause(true) }
+            ChoiceButton("Auto-Pause", status.phase == RidePhase.PAUSED_AUTO, riding, w) { actions.simulatePause(false) }
+        }
+        ChoiceButton("Weiterfahren", selected = false, enabled = paused, modifier = wide) { actions.simulateResume() }
     }
 }

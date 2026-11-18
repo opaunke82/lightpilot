@@ -34,6 +34,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import io.github.opaunke82.lightpilot.DiscoveredLight
+import io.github.opaunke82.lightpilot.batteryText
 import io.github.opaunke82.lightpilot.connectionLabel
 import io.github.opaunke82.lightpilot.data.LightModeOption
 import io.github.opaunke82.lightpilot.data.LightProtocol
@@ -86,7 +87,7 @@ fun LightDetailDialog(
                         light.manufacturer,
                         protocol,
                         light.connectionLabel(),
-                        light.batteryPercent?.let { "Akku $it %" },
+                        batteryText(light.protocol, light.batteryPercent),
                     ).joinToString(" · "),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
