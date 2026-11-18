@@ -37,6 +37,10 @@ class PreferencesRepository(private val context: Context) {
         }
     }
 
+    suspend fun clear() {
+        context.dataStore.edit { it.clear() }
+    }
+
     suspend fun updateSettings(settings: AppSettings) {
         context.dataStore.edit { preferences ->
             preferences[SETTINGS_KEY] = json.encodeToString(AppSettings.serializer(), settings)

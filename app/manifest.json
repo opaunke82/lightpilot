@@ -3,9 +3,9 @@
   "packageName": "io.github.opaunke82.lightpilot",
   "iconUrl": "https://raw.githubusercontent.com/opaunke82/lightpilot/main/docs/icon.svg",
   "latestApkUrl": "https://github.com/opaunke82/lightpilot/releases/latest/download/lightpilot.apk",
-  "latestVersion": "0.1.3",
-  "latestVersionCode": 5,
+  "latestVersion": "0.1.4",
+  "latestVersionCode": 6,
   "developer": "opaunke82",
   "description": "Lichtsteuerung für Garmin Varia (ANT+) und Magicshine EVO 1700 (Bluetooth): nachts blinken, tagsüber nur bei Annäherung, Sparmodus, Pause-Regeln.",
-  "releaseNotes": "Simulation überarbeitet (Tag/Nacht erzwingen, Steuerung direkt wählbar, Pause-Countdown), Datenfeld zeigt die Steuerung, Akku als Stufe, Name wie im Karoo."
+  "releaseNotes": "Tag/Nacht auch ohne GPS-Fix (letzte Position bzw. Zeitzone), Lichtname aktuell wie im Karoo, Werkseinstellungen mit Bestätigung."
 }

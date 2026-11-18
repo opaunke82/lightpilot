@@ -166,6 +166,7 @@ class LightPilotExtension : KarooExtension(EXTENSION_ID, BuildConfig.VERSION_NAM
                 ant.map { it.copy(connected = isAntConnected(it.id, conn, modes), connectionState = conn[it.id]) } + ble
             }.collect { merged ->
                 _discoveredLights.value = merged
+                syncLightNames(merged)
                 merged.filter { it.protocol == LightProtocol.BLE }.forEach { engine.onBattery(it.id, it.batteryPercent) }
                 engine.refresh()
             }
@@ -175,14 +176,86 @@ class LightPilotExtension : KarooExtension(EXTENSION_ID, BuildConfig.VERSION_NAM
             repository.settingsFlow.collect { applySettings(it) }
         }
 
+        loadFallbackLocation()
+
         karooSystem.connect { connected ->
             Timber.d("$TAG: Karoo system connected=$connected")
             if (connected) {
                 karooSystem.addConsumer<OnLocationChanged> { event ->
                     timeController.onLocationUpdate(event.lat, event.lng)
+                    saveLocation(event.lat, event.lng)
                 }
                 karooSystem.addConsumer<RideState> { state -> onRideState(state) }
             }
+        }
+    }
+
+    // ---- Location fallback ------------------------------------------------------------
+
+    private val locationPrefs by lazy { getSharedPreferences("lightpilot_location", android.content.Context.MODE_PRIVATE) }
+    private var lastSavedLocationMs = 0L
+
+    /**
+     * Until the first GPS fix (indoors, start of a ride) the sun times come from the
+     * last known position or, before the very first fix, from the time zone.
+     * Without this the zone stayed DAY at night (18.11.2026).
+     */
+    private fun loadFallbackLocation() {
+        val lat = locationPrefs.getFloat("lat", Float.NaN)
+        val lng = locationPrefs.getFloat("lng", Float.NaN)
+        if (!lat.isNaN() && !lng.isNaN()) {
+            timeController.setFallbackLocation(lat.toDouble(), lng.toDouble(), estimated = false)
+            Timber.d("$TAG: sun times from last known position")
+            return
+        }
+        val tz = java.util.TimeZone.getDefault()
+        val (estLat, estLng) = when (tz.id) {
+            // Germany: roughly the centre of the country.
+            "Europe/Berlin", "Europe/Busingen" -> 51.2 to 10.4
+            else -> 50.0 to tz.rawOffset / 3_600_000.0 * 15.0
+        }
+        timeController.setFallbackLocation(estLat, estLng, estimated = true)
+        Timber.d("$TAG: sun times estimated from time zone ${tz.id}")
+    }
+
+    private fun saveLocation(lat: Double, lng: Double) {
+        val now = System.currentTimeMillis()
+        if (now - lastSavedLocationMs < 10 * 60_000L) return
+        lastSavedLocationMs = now
+        locationPrefs.edit().putFloat("lat", lat.toFloat()).putFloat("lng", lng.toFloat()).apply()
+    }
+
+    /** Stored lights keep the name from the moment they were set up; keep it current. */
+    private fun syncLightNames(lights: List<DiscoveredLight>) {
+        val current = settings
+        var changed = false
+        val updated = current.lights.map { setup ->
+            val name = lights.firstOrNull { it.id == setup.deviceId }?.name
+            if (name != null && name != setup.deviceName) {
+                changed = true
+                setup.copy(deviceName = name)
+            } else {
+                setup
+            }
+        }
+        if (changed) {
+            val next = current.copy(lights = updated)
+            settings = next
+            extensionScope.launch { repository.updateSettings(next) }
+        }
+    }
+
+    /** Factory reset: all settings, stored position and log, then a fresh engine state. */
+    fun factoryReset() {
+        Timber.w("$TAG: factory reset")
+        engine.resetAll()
+        for (id in magicshineController.assignedDeviceIds) magicshineController.disconnect(id)
+        locationPrefs.edit().clear().apply()
+        lastSavedLocationMs = 0
+        extensionScope.launch {
+            repository.clear()
+            applySettings(AppSettings())
+            loadFallbackLocation()
         }
     }
 

@@ -167,6 +167,21 @@ class LightPilotEngine(
         evaluate()
     }
 
+    /** Factory reset: forget all state, leave the simulation. Lights get no command. */
+    fun resetAll() = post {
+        brain = BrainState()
+        links.clear()
+        lastDesired.clear()
+        rideEndedAtMs = null
+        simulation = false
+        simRide = false
+        simVehicleUntilMs = 0
+        simZone = null
+        settings = AppSettings()
+        _status.value = EngineStatus()
+        Timber.d("$TAG: reset")
+    }
+
     /** Re-evaluates now, e.g. after a light connected; also keeps the status page current. */
     fun refresh() = post { evaluate() }
 
