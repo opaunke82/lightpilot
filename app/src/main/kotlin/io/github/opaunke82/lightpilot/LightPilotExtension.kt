@@ -51,6 +51,8 @@ data class DiscoveredLight(
     val temperature: Int? = null,
     /** Raw state from the Karoo (ANT+ only), null if the Karoo has not reported one. */
     val connectionState: String? = null,
+    /** ANT+ light in a radar (Varia): connection judged by the radar data of the same device. */
+    val viaRadar: Boolean = false,
 )
 
 /**
@@ -83,6 +85,7 @@ fun batteryText(protocol: LightProtocol, pct: Int?): String? = pct?.let {
 /** Text for the light list and dialog. */
 fun DiscoveredLight.connectionLabel(): String = when {
     protocol == LightProtocol.BLE -> if (connected) "verbunden" else "nicht verbunden"
+    viaRadar -> if (connected) "verbunden (Radar liefert Daten)" else "nicht verbunden (Radar liefert keine Daten)"
     connectionState == "CONNECTED" -> "verbunden"
     connectionState == null && connected -> "verbunden (vom Karoo nicht gemeldet)"
     connectionState == "SEARCHING" -> "sucht"
@@ -97,6 +100,8 @@ class LightPilotExtension : KarooExtension(EXTENSION_ID, BuildConfig.VERSION_NAM
         const val EXTENSION_ID = "lightpilot"
         private const val BIKE_LIGHT_DATA_TYPE = "TYPE_BIKE_LIGHT_ID"
         private const val DEVICE_TYPE_BIKE_LIGHT = 35
+        /** Same as the radar watchdog: after this long without radar data the Varia counts as off. */
+        private const val RADAR_ALIVE_MS = 5_000L
 
         @Volatile
         private var instance: LightPilotExtension? = null
@@ -128,7 +133,13 @@ class LightPilotExtension : KarooExtension(EXTENSION_ID, BuildConfig.VERSION_NAM
         private set
 
     private var savedDevicesConsumerId: String? = null
-    private var radarConsumerId: String? = null
+    @Volatile private var radarConsumerId: String? = null
+    private var radarWatchJob: Job? = null
+    @Volatile private var radarLastDataMs = 0L
+    private val _radarAlive = MutableStateFlow(false)
+
+    /** ANT+ lights that sit in a radar (same serial number as a radar entry). */
+    @Volatile private var antLightsWithRadar: Set<String> = emptySet()
     private var discoveryJob: Job? = null
     private var bleStartJob: Job? = null
 
@@ -162,8 +173,15 @@ class LightPilotExtension : KarooExtension(EXTENSION_ID, BuildConfig.VERSION_NAM
                 magicshineController.discoveredLights,
                 lightControl.connectionStates,
                 lightControl.currentModes,
-            ) { ant, ble, conn, modes ->
-                ant.map { it.copy(connected = isAntConnected(it.id, conn, modes), connectionState = conn[it.id]) } + ble
+                _radarAlive,
+            ) { ant, ble, conn, modes, radarAlive ->
+                ant.map {
+                    it.copy(
+                        connected = isAntConnected(it.id, conn, modes, radarAlive),
+                        connectionState = conn[it.id],
+                        viaRadar = usesRadarForConnection(it.id),
+                    )
+                } + ble
             }.collect { merged ->
                 _discoveredLights.value = merged
                 syncLightNames(merged)
@@ -304,20 +322,27 @@ class LightPilotExtension : KarooExtension(EXTENSION_ID, BuildConfig.VERSION_NAM
     // ---- Light access -----------------------------------------------------------------
 
     /**
-     * The Karoo does not always report a connection state after registering
-     * (seen on the Varia RTL515, 18.11.2026; LightONKaroo handles it the same way).
-     * So a light counts as connected unless the Karoo explicitly says otherwise,
-     * or as soon as it reports a mode. Sending to a light that is away is harmless:
-     * the reconciler simply sends again.
+     * The Karoo does not report a connection state for the light (Varia RTL515,
+     * 18.11.2026), not even when it is switched off at its button. For a light inside
+     * a radar the radar data of the same device tells the truth: no radar data, light
+     * off. Other ANT+ lights count as connected unless the Karoo says otherwise.
+     * (The last reported mode is not used: it stays stored after the light went off.)
      */
-    private fun isAntConnected(id: String, conn: Map<String, String>, modes: Map<String, String>): Boolean {
+    private fun isAntConnected(
+        id: String,
+        conn: Map<String, String>,
+        modes: Map<String, String>,
+        radarAlive: Boolean = _radarAlive.value,
+    ): Boolean {
         if (!lightControl.isConnected()) return false
-        if (modes.containsKey(id)) return true
-        return when (conn[id]) {
-            "DISCONNECTED", "DISABLED", "NOT_AVAILABLE" -> false
-            else -> true
+        when (conn[id]) {
+            "DISCONNECTED", "DISABLED", "NOT_AVAILABLE" -> return false
         }
+        if (usesRadarForConnection(id)) return radarAlive
+        return true
     }
+
+    private fun usesRadarForConnection(id: String) = id in antLightsWithRadar && radarConsumerId != null
 
     private val lightIo = object : LightIo {
         override fun connected(light: LightSetup): Boolean = when (light.protocol) {
@@ -416,6 +441,12 @@ class LightPilotExtension : KarooExtension(EXTENSION_ID, BuildConfig.VERSION_NAM
                 val parts = device.id.split("-")
                 parts.size >= 3 && parts[1].toIntOrNull() == DEVICE_TYPE_BIKE_LIGHT
             }
+            antLightsWithRadar = lights.filter { device ->
+                val serial = device.id.split("-").getOrNull(2)
+                serial != null && saved.devices.any { other ->
+                    other.id != device.id && other.id.split("-").getOrNull(2) == serial
+                }
+            }.map { it.id }.toSet()
             _antLights.value = lights.map { device ->
                 // A radar with a built-in light shows up twice: as radar and as light,
                 // with the same serial number. The Karoo shows the radar's name
@@ -496,8 +527,26 @@ class LightPilotExtension : KarooExtension(EXTENSION_ID, BuildConfig.VERSION_NAM
         ) { event: OnStreamState ->
             val state = event.state
             if (state is StreamState.Streaming) {
+                radarLastDataMs = System.currentTimeMillis()
+                if (!_radarAlive.value) Timber.d("$TAG: radar data present")
+                _radarAlive.value = true
                 val level = state.dataPoint.values[DataType.Field.RADAR_THREAT_LEVEL]?.toInt() ?: 0
                 engine.onRadar(level)
+            } else {
+                if (_radarAlive.value) Timber.d("$TAG: radar stream ${state.javaClass.simpleName}")
+                radarLastDataMs = 0
+                _radarAlive.value = false
+            }
+        }
+        radarWatchJob?.cancel()
+        radarWatchJob = extensionScope.launch {
+            while (true) {
+                delay(1_000)
+                val silent = System.currentTimeMillis() - radarLastDataMs > RADAR_ALIVE_MS
+                if (silent && _radarAlive.value) {
+                    Timber.d("$TAG: no radar data for ${RADAR_ALIVE_MS / 1000} s")
+                    _radarAlive.value = false
+                }
             }
         }
     }
@@ -505,6 +554,9 @@ class LightPilotExtension : KarooExtension(EXTENSION_ID, BuildConfig.VERSION_NAM
     private fun stopRadar() {
         radarConsumerId?.let { karooSystem.removeConsumer(it) }
         radarConsumerId = null
+        radarWatchJob?.cancel()
+        radarWatchJob = null
+        _radarAlive.value = false
     }
 
     // ---- In-ride input ----------------------------------------------------------------

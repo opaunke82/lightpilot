@@ -56,6 +56,9 @@ object EventLog {
     class Tree : Timber.Tree() {
         override fun log(priority: Int, tag: String?, message: String, t: Throwable?) {
             if (priority < Log.DEBUG) return
+            // The SDK logs every consumer registration; the device list is polled every
+            // 30 s, which pushed the useful lines off the status page.
+            if (message.startsWith("KarooSystem: addConsumer") || message.startsWith("KarooSystem: removeConsumer")) return
             add(tag, if (t == null) message else "$message (${t.javaClass.simpleName}: ${t.message})")
         }
     }
