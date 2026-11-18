@@ -61,6 +61,20 @@ class ReconcilerTest {
     }
 
     @Test
+    fun staleReportRightAfterCommandIsNotExternal() {
+        var r = Reconciler.step(LinkState(), "SLOW_FLASH", "SLOW_FLASH", true, 0)
+        r = Reconciler.step(r.link, MODE_OFF, "SLOW_FLASH", true, 10_000)
+        assertEquals(MODE_OFF, r.send)
+        r = Reconciler.step(r.link, MODE_OFF, MODE_OFF, true, 10_300)
+        assertTrue(r.confirmed)
+        // The Karoo reports the old mode once more: not an external change, just resend.
+        r = Reconciler.step(r.link, MODE_OFF, "SLOW_FLASH", true, 10_800)
+        assertNull(r.externalChange)
+        r = Reconciler.step(r.link, MODE_OFF, "SLOW_FLASH", true, 12_100)
+        assertEquals(MODE_OFF, r.send)
+    }
+
+    @Test
     fun firstReportIsNotExternal() {
         val r = Reconciler.step(LinkState(), null, "STEADY4", true, 0)
         assertNull(r.externalChange)

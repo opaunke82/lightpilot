@@ -140,6 +140,7 @@ class LightPilotExtension : KarooExtension(EXTENSION_ID, BuildConfig.VERSION_NAM
             }.collect { merged ->
                 _discoveredLights.value = merged
                 merged.filter { it.protocol == LightProtocol.BLE }.forEach { engine.onBattery(it.id, it.batteryPercent) }
+                engine.refresh()
             }
         }
 
