@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.opaunke82.lightpilot.BuildConfig
 import io.github.opaunke82.lightpilot.DiscoveredLight
+import io.github.opaunke82.lightpilot.connectionLabel
 import io.github.opaunke82.lightpilot.core.Reason
 import io.github.opaunke82.lightpilot.core.RidePhase
 import io.github.opaunke82.lightpilot.data.AppSettings
@@ -294,7 +295,7 @@ private fun LightList(
         val info = listOfNotNull(
             protocol,
             light.manufacturer,
-            if (light.connected) "verbunden" else "nicht verbunden",
+            light.connectionLabel(),
             light.batteryPercent?.let { "Akku $it %" },
         ).joinToString(" · ")
         Row(

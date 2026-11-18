@@ -49,7 +49,19 @@ data class DiscoveredLight(
     val connected: Boolean = true,
     val batteryPercent: Int? = null,
     val temperature: Int? = null,
+    /** Raw state from the Karoo (ANT+ only), null if the Karoo has not reported one. */
+    val connectionState: String? = null,
 )
+
+/** Text for the light list and dialog. */
+fun DiscoveredLight.connectionLabel(): String = when {
+    protocol == LightProtocol.BLE -> if (connected) "verbunden" else "nicht verbunden"
+    connectionState == "CONNECTED" -> "verbunden"
+    connectionState == null && connected -> "verbunden (vom Karoo nicht gemeldet)"
+    connectionState == "SEARCHING" -> "sucht"
+    connectionState == null -> "nicht verbunden"
+    else -> "nicht verbunden ($connectionState)"
+}
 
 class LightPilotExtension : KarooExtension(EXTENSION_ID, BuildConfig.VERSION_NAME) {
 
@@ -118,8 +130,13 @@ class LightPilotExtension : KarooExtension(EXTENSION_ID, BuildConfig.VERSION_NAM
         magicshineController.onDeviceConnected = { stopBleScanIfDone() }
 
         extensionScope.launch {
-            combine(_antLights, magicshineController.discoveredLights, lightControl.connectionStates) { ant, ble, conn ->
-                ant.map { it.copy(connected = conn[it.id] == "CONNECTED") } + ble
+            combine(
+                _antLights,
+                magicshineController.discoveredLights,
+                lightControl.connectionStates,
+                lightControl.currentModes,
+            ) { ant, ble, conn, modes ->
+                ant.map { it.copy(connected = isAntConnected(it.id, conn, modes), connectionState = conn[it.id]) } + ble
             }.collect { merged ->
                 _discoveredLights.value = merged
                 merged.filter { it.protocol == LightProtocol.BLE }.forEach { engine.onBattery(it.id, it.batteryPercent) }
@@ -185,10 +202,29 @@ class LightPilotExtension : KarooExtension(EXTENSION_ID, BuildConfig.VERSION_NAM
 
     // ---- Light access -----------------------------------------------------------------
 
+    /**
+     * The Karoo does not always report a connection state after registering
+     * (seen on the Varia RTL515, 18.11.2026; LightONKaroo handles it the same way).
+     * So a light counts as connected unless the Karoo explicitly says otherwise,
+     * or as soon as it reports a mode. Sending to a light that is away is harmless:
+     * the reconciler simply sends again.
+     */
+    private fun isAntConnected(id: String, conn: Map<String, String>, modes: Map<String, String>): Boolean {
+        if (!lightControl.isConnected()) return false
+        if (modes.containsKey(id)) return true
+        return when (conn[id]) {
+            "DISCONNECTED", "DISABLED", "NOT_AVAILABLE" -> false
+            else -> true
+        }
+    }
+
     private val lightIo = object : LightIo {
         override fun connected(light: LightSetup): Boolean = when (light.protocol) {
-            LightProtocol.ANT_PLUS ->
-                lightControl.isConnected() && lightControl.connectionStates.value[light.deviceId] == "CONNECTED"
+            LightProtocol.ANT_PLUS -> isAntConnected(
+                light.deviceId,
+                lightControl.connectionStates.value,
+                lightControl.currentModes.value,
+            )
             LightProtocol.BLE -> magicshineController.allConnected(setOf(light.deviceId))
         }
 
@@ -292,7 +328,12 @@ class LightPilotExtension : KarooExtension(EXTENSION_ID, BuildConfig.VERSION_NAM
                     id = device.id,
                     name = device.name,
                     manufacturer = device.details?.manufacturer,
-                    connected = lightControl.connectionStates.value[device.id] == "CONNECTED",
+                    connected = isAntConnected(
+                        device.id,
+                        lightControl.connectionStates.value,
+                        lightControl.currentModes.value,
+                    ),
+                    connectionState = lightControl.connectionStates.value[device.id],
                     batteryPercent = battery,
                 )
             }

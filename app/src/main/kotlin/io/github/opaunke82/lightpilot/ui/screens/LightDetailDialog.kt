@@ -34,6 +34,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import io.github.opaunke82.lightpilot.DiscoveredLight
+import io.github.opaunke82.lightpilot.connectionLabel
 import io.github.opaunke82.lightpilot.data.LightModeOption
 import io.github.opaunke82.lightpilot.data.LightProtocol
 import io.github.opaunke82.lightpilot.data.LightRole
@@ -84,7 +85,7 @@ fun LightDetailDialog(
                     listOfNotNull(
                         light.manufacturer,
                         protocol,
-                        if (light.connected) "verbunden" else "nicht verbunden",
+                        light.connectionLabel(),
                         light.batteryPercent?.let { "Akku $it %" },
                     ).joinToString(" · "),
                     style = MaterialTheme.typography.bodySmall,
