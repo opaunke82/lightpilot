@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ExtensionInfo
+    displayName="@string/app_name"
+    icon="@drawable/ic_lightpilot"
+    id="lightpilot">
+
+    <DataType
+        typeId="status"
+        displayName="@string/field_status"
+        description="@string/field_status_desc"
+        graphical="true"
+        icon="@drawable/ic_light" />
+
+    <DataType
+        typeId="front"
+        displayName="@string/field_front"
+        description="@string/field_front_desc"
+        graphical="true"
+        icon="@drawable/ic_light" />
+
+    <BonusAction
+        actionId="manual-cycle"
+        displayName="@string/action_manual_cycle" />
+
+    <BonusAction
+        actionId="front-cycle"
+        displayName="@string/action_front_cycle" />
+</ExtensionInfo>

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">LightPilot</string>
+    <string name="field_status">LightPilot</string>
+    <string name="field_status_desc">Lichtmodus, Tag/Nacht und Radar. Tippen: Automatik, An, Aus, Hart aus.</string>
+    <string name="field_front">Frontlicht</string>
+    <string name="field_front_desc">Modus des Frontlichts. Tippen: nächste Helligkeit.</string>
+    <string name="action_manual_cycle">Licht: Automatik / An / Aus / Hart aus</string>
+    <string name="action_front_cycle">Frontlicht: nächste Helligkeit</string>
+</resources>
