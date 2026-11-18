@@ -1,0 +1,85 @@
+# Builds LightPilot on every push and attaches the APK to every published release.
+# Required repository secrets (Settings > Secrets and variables > Actions):
+#   KAROO_EXT_TOKEN    classic GitHub token with read:packages (for the karoo-ext SDK)
+#   KEYSTORE_BASE64    release keystore, base64-encoded
+#   KEYSTORE_PASSWORD  keystore password
+#   KEY_ALIAS          key alias in the keystore
+#   KEY_PASSWORD       key password
+# Without the keystore secrets a debug-signed APK is built instead (updates then need a reinstall).
+name: Build
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: read
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # full history for the versionCode
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Test core logic
+        run: ./gradlew :core:test
+
+      - name: Decode keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.jks"
+            echo "KEYSTORE_PATH=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
+          else
+            echo "::warning::No KEYSTORE_BASE64 secret: building a debug-signed APK."
+          fi
+
+      - name: Build APK
+        env:
+          USERNAME: ${{ github.actor }}
+          TOKEN: ${{ secrets.KAROO_EXT_TOKEN }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "release" ]; then
+            export VERSION_NAME="${GITHUB_REF_NAME#v}"
+          else
+            export VERSION_NAME="0.1.0-${GITHUB_SHA::7}"
+          fi
+          if [ -n "$KEYSTORE_PATH" ]; then
+            ./gradlew :app:assembleRelease
+            cp app/build/outputs/apk/release/app-release.apk lightpilot.apk
+          else
+            ./gradlew :app:assembleDebug
+            cp app/build/outputs/apk/debug/app-debug.apk lightpilot.apk
+          fi
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: lightpilot
+          path: lightpilot.apk
+
+      - name: Attach APK to release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: lightpilot.apk
