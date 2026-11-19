@@ -83,12 +83,11 @@ fun LightDetailDialog(
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                 val protocol = if (light.protocol == LightProtocol.BLE) "Bluetooth" else "ANT+"
                 Text(
-                    listOfNotNull(
-                        light.manufacturer,
-                        protocol,
-                        light.connectionLabel(),
-                        batteryText(light.protocol, light.batteryPercent),
-                    ).joinToString(" · "),
+                    withBatteryColor(
+                        listOfNotNull(light.manufacturer, protocol, light.connectionLabel()).joinToString(" · "),
+                        light.protocol,
+                        light.batteryPercent,
+                    ),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

@@ -8,6 +8,9 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.graphics.Color
+import android.text.SpannableStringBuilder
+import android.text.Spanned
+import android.text.style.ForegroundColorSpan
 import android.widget.RemoteViews
 import io.github.opaunke82.lightpilot.LightPilotExtension
 import io.github.opaunke82.lightpilot.R
@@ -15,7 +18,9 @@ import io.github.opaunke82.lightpilot.core.ManualMode
 import io.github.opaunke82.lightpilot.core.RidePhase
 import io.github.opaunke82.lightpilot.core.Zone
 import io.github.opaunke82.lightpilot.data.LightRole
+import io.github.opaunke82.lightpilot.batteryColor
 import io.github.opaunke82.lightpilot.batteryText
+import io.github.opaunke82.lightpilot.data.LightProtocol
 import io.github.opaunke82.lightpilot.engine.EngineStatus
 import io.hammerhead.karooext.extension.DataTypeImpl
 import io.hammerhead.karooext.internal.Emitter
@@ -45,6 +50,20 @@ fun manualLabel(mode: ManualMode): String = when (mode) {
     ManualMode.ON -> "An"
     ManualMode.OFF -> "Aus"
     ManualMode.HARD_OFF -> "Hart aus"
+}
+
+/** "<text> · <battery>" with the battery part in its colour (plain on the red warning background). */
+private fun withBattery(text: String?, protocol: LightProtocol, pct: Int?, colored: Boolean): CharSequence {
+    val out = SpannableStringBuilder(text ?: "")
+    val battery = batteryText(protocol, pct) ?: return out
+    if (out.isNotEmpty()) out.append(" · ")
+    val start = out.length
+    out.append(battery)
+    val color = batteryColor(protocol, pct)
+    if (colored && color != null) {
+        out.setSpan(ForegroundColorSpan(color), start, out.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+    }
+    return out
 }
 
 fun zoneLabel(zone: Zone): String = if (zone == Zone.NIGHT) "Nacht" else "Tag"
@@ -96,12 +115,14 @@ class StatusDataType(private val ext: LightPilotExtension) :
             !rear.connected -> "Rück getrennt"
             else -> "Rück: ${shortModeName(rear.desired)}"
         }
-        val battery = rear?.let { batteryText(it.setup.protocol, it.batteryPct) }
         // Title: day/night and radar. Main line: the manual setting, i.e. what a tap changes,
         // so every tap is visible even if the light itself stays the same (e.g. by day).
         views.setTextViewText(R.id.field_title, if (idle) "LightPilot" else "${zoneLabel(s.zone)} · $radar")
         views.setTextViewText(R.id.field_main, if (idle) "keine Fahrt" else manualLabel(s.manual))
-        views.setTextViewText(R.id.field_sub, listOfNotNull(rearText, battery).joinToString(" · "))
+        views.setTextViewText(
+            R.id.field_sub,
+            if (rear == null) rearText else withBattery(rearText, rear.setup.protocol, rear.batteryPct, !s.radarWarning),
+        )
         views.setInt(R.id.field_root, "setBackgroundColor", if (s.radarWarning) RED else Color.TRANSPARENT)
         views.setTextColor(R.id.field_sub, if (s.radarWarning) Color.WHITE else GREY)
         views.setTextColor(R.id.field_title, if (s.radarWarning) Color.WHITE else GREY)
@@ -156,8 +177,7 @@ class FrontLightDataType(private val ext: LightPilotExtension) :
                 } else {
                     views.setTextViewText(R.id.field_main, shortModeName(front.desired))
                     val state = if (front.connected) "Tippen: nächste Stufe" else "getrennt"
-                    val battery = batteryText(front.setup.protocol, front.batteryPct)
-                    views.setTextViewText(R.id.field_sub, listOfNotNull(state, battery).joinToString(" · "))
+                    views.setTextViewText(R.id.field_sub, withBattery(state, front.setup.protocol, front.batteryPct, true))
                 }
                 views.setTextColor(R.id.field_sub, GREY)
                 if (ext.isRideActive || s.simulation) {

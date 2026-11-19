@@ -82,6 +82,11 @@ data class Settings(
     val offAfterRide: Boolean = true,
     /** Peloton mode is offered on the data field. Off: it is skipped and acts like automatic. */
     val pelotonEnabled: Boolean = true,
+    /**
+     * Front field: taps within this time step through the cycle; the first tap after a longer
+     * break switches the light off (if "off" is in the cycle). 0 = always the next step.
+     */
+    val fieldCycleWindowMs: Long = 5_000,
 )
 
 /** Why a light gets its mode. Shown on the status page and written to the log. */

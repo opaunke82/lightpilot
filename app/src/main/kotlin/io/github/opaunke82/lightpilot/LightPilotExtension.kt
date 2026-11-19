@@ -82,6 +82,36 @@ fun batteryText(protocol: LightProtocol, pct: Int?): String? = pct?.let {
     }
 }
 
+/**
+ * Colour of the battery text: green = full to half (Varia: neu, gut), yellow = 49 to 20 %
+ * (Varia: ok), red = below (Varia: niedrig, kritisch). null if unknown.
+ */
+fun batteryColor(protocol: LightProtocol, pct: Int?): Int? = pct?.let {
+    val level = if (protocol == LightProtocol.BLE) {
+        when {
+            it >= 50 -> 2
+            it >= 20 -> 1
+            else -> 0
+        }
+    } else {
+        // Varia classes: NEW 100, GOOD 80, OK 50, LOW 20, CRITICAL 5.
+        when {
+            it >= 80 -> 2
+            it >= 50 -> 1
+            else -> 0
+        }
+    }
+    when (level) {
+        2 -> BATTERY_GREEN
+        1 -> BATTERY_YELLOW
+        else -> BATTERY_RED
+    }
+}
+
+const val BATTERY_GREEN = 0xFF2E7D32.toInt()
+const val BATTERY_YELLOW = 0xFFF9A825.toInt()
+const val BATTERY_RED = 0xFFC62828.toInt()
+
 /** Text for the light list and dialog. */
 fun DiscoveredLight.connectionLabel(): String = when {
     protocol == LightProtocol.BLE -> if (connected) "verbunden" else "nicht verbunden"

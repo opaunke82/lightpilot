@@ -203,15 +203,31 @@ class BrainTest {
     }
 
     @Test
-    fun frontFieldCycleCanSwitchOff() {
+    fun frontFieldCycleWindow() {
         val front = evo.copy(fieldModes = listOf("STEADY_25", "STEADY_50", "STEADY_100", MODE_OFF))
         var s = run(BrainEvent.RideChanged(RidePhase.RECORDING, 0), BrainEvent.ZoneChanged(Zone.NIGHT))
-        val seen = mutableListOf<String?>()
-        repeat(5) {
-            s = run(BrainEvent.FieldCycle(front), from = s)
-            seen += mode(s, front, 100)
+        fun tap(at: Long): String? {
+            s = run(BrainEvent.FieldCycle(front, at), from = s)
+            return mode(s, front, at)
         }
-        assertEquals(listOf<String?>("STEADY_25", "STEADY_50", "STEADY_100", MODE_OFF, "STEADY_25"), seen)
+        // Night mode 50 % is on: the first tap after a break switches off,
+        // further taps within 5 s step up through the cycle.
+        val seen = listOf(1_000L, 2_000, 3_000, 4_000, 5_000, 6_000).map { tap(it) }
+        assertEquals(listOf<String?>(MODE_OFF, "STEADY_25", "STEADY_50", "STEADY_100", MODE_OFF, "STEADY_25"), seen)
+        // Break of more than 5 s while on: off.
+        assertEquals(MODE_OFF, tap(20_000))
+        // Break while off: the tap switches on again.
+        assertEquals("STEADY_25", tap(40_000))
+    }
+
+    @Test
+    fun frontFieldCycleWithoutWindow() {
+        val noWindow = settings.copy(fieldCycleWindowMs = 0)
+        val front = evo.copy(fieldModes = listOf("STEADY_25", "STEADY_50", "STEADY_100", MODE_OFF))
+        var s = listOf(BrainEvent.RideChanged(RidePhase.RECORDING, 0), BrainEvent.ZoneChanged(Zone.NIGHT))
+            .fold(BrainState()) { acc, e -> Brain.reduce(acc, e, noWindow) }
+        s = Brain.reduce(s, BrainEvent.FieldCycle(front, 10_000), noWindow)
+        assertEquals("STEADY_25", Brain.decide(s, front, noWindow, 10_000).mode)
     }
 
     @Test

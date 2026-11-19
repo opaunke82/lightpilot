@@ -163,7 +163,7 @@ class LightPilotEngine(
     fun frontCycle() = post {
         val front = settings.lights.firstOrNull { it.role == LightRole.FRONT && it.fieldModes.isNotEmpty() }
             ?: return@post
-        apply(BrainEvent.FieldCycle(front.toCore()))
+        apply(BrainEvent.FieldCycle(front.toCore(), now()))
         evaluate()
     }
 
