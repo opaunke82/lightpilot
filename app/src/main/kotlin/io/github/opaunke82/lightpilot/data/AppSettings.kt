@@ -74,7 +74,7 @@ data class LightSetup(
                     pelotonWarnMode = "STEADY_100",
                     radarWarning = false,
                     saverNightMode = "STEADY_10",
-                    fieldModes = listOf("STEADY_25", "STEADY_50", "STEADY_100"),
+                    fieldModes = listOf("STEADY_25", "STEADY_50", "STEADY_100", MODE_OFF),
                 )
                 else -> LightSetup(
                     deviceId, deviceName, protocol, role,

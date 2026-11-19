@@ -7,5 +7,5 @@
   "latestVersionCode": 9,
   "developer": "opaunke82",
   "description": "Lichtsteuerung für Garmin Varia (ANT+) und Magicshine EVO 1700 (Bluetooth): nachts blinken, tagsüber nur bei Annäherung, Sparmodus, Pause-Regeln.",
-  "releaseNotes": "Frontlicht-Stufe bleibt beim Wechsel Automatik/Peloton erhalten, Simulationsknöpfe ohne Zeilenumbruch, Live-Protokoll auf der Seite entfernt."
+  "releaseNotes": "Frontlicht-Datenfeld kann ausschalten, Frontlicht-Stufe bleibt beim Wechsel Automatik/Peloton erhalten, Simulationsknöpfe ohne Zeilenumbruch, Live-Protokoll auf der Seite entfernt."
 }

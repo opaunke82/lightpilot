@@ -203,6 +203,18 @@ class BrainTest {
     }
 
     @Test
+    fun frontFieldCycleCanSwitchOff() {
+        val front = evo.copy(fieldModes = listOf("STEADY_25", "STEADY_50", "STEADY_100", MODE_OFF))
+        var s = run(BrainEvent.RideChanged(RidePhase.RECORDING, 0), BrainEvent.ZoneChanged(Zone.NIGHT))
+        val seen = mutableListOf<String?>()
+        repeat(5) {
+            s = run(BrainEvent.FieldCycle(front), from = s)
+            seen += mode(s, front, 100)
+        }
+        assertEquals(listOf<String?>("STEADY_25", "STEADY_50", "STEADY_100", MODE_OFF, "STEADY_25"), seen)
+    }
+
+    @Test
     fun pelotonSwitchedOffActsLikeAutomatic() {
         val off = settings.copy(pelotonEnabled = false)
         val s = listOf(
