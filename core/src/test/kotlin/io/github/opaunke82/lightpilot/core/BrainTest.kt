@@ -184,6 +184,25 @@ class BrainTest {
     }
 
     @Test
+    fun frontFieldChoiceSurvivesSwitchToPeloton() {
+        var s = run(
+            BrainEvent.RideChanged(RidePhase.RECORDING, 0),
+            BrainEvent.FieldCycle(evo),
+        )
+        val pinned = mode(s, evo, 100)
+        assertEquals("STEADY_25", pinned)
+        s = run(BrainEvent.ManualCycle, from = s)
+        assertEquals(ManualMode.PELOTON, s.manual)
+        assertEquals(pinned, mode(s, evo, 200))
+        s = run(BrainEvent.ManualSet(ManualMode.AUTO), from = s)
+        assertEquals(pinned, mode(s, evo, 300))
+        // Leaving the automatic modes still ends the choice.
+        s = run(BrainEvent.ManualSet(ManualMode.PELOTON), BrainEvent.ManualCycle, from = s)
+        assertEquals(ManualMode.ON, s.manual)
+        assertEquals("STEADY_50", mode(s, evo, 400))
+    }
+
+    @Test
     fun pelotonSwitchedOffActsLikeAutomatic() {
         val off = settings.copy(pelotonEnabled = false)
         val s = listOf(

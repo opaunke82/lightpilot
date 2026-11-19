@@ -68,6 +68,15 @@ sealed interface BrainEvent {
  */
 object Brain {
 
+    /**
+     * A manual change ends per-light choices (front brightness from the field, changes on the
+     * light), except between Automatik and Peloton: both are automatic, so the choices stay.
+     */
+    private fun pinsAfterManualChange(state: BrainState, next: ManualMode): Map<String, Pin> {
+        val automatic = setOf(ManualMode.AUTO, ManualMode.PELOTON)
+        return if (state.manual in automatic && next in automatic) state.pins else emptyMap()
+    }
+
     fun reduce(state: BrainState, event: BrainEvent, settings: Settings): BrainState = when (event) {
         is BrainEvent.RideChanged -> onRide(state, event)
 
@@ -92,9 +101,11 @@ object Brain {
             )
         }
 
-        BrainEvent.ManualCycle -> state.copy(manual = state.manual.next(settings.pelotonEnabled), pins = emptyMap())
+        BrainEvent.ManualCycle -> state.manual.next(settings.pelotonEnabled).let { next ->
+            state.copy(manual = next, pins = pinsAfterManualChange(state, next))
+        }
 
-        is BrainEvent.ManualSet -> state.copy(manual = event.mode, pins = emptyMap())
+        is BrainEvent.ManualSet -> state.copy(manual = event.mode, pins = pinsAfterManualChange(state, event.mode))
 
         is BrainEvent.ExternalChange ->
             state.copy(pins = state.pins + (event.lightId to Pin(event.mode, PinSource.EXTERNAL)))

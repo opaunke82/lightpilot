@@ -77,7 +77,6 @@ class MainActivity : ComponentActivity() {
                 val bleScanning = ext?.magicshineController?.scanning?.collectAsState()?.value ?: false
                 val status = ext?.engine?.status?.collectAsState()?.value ?: EngineStatus()
                 val lux = ext?.ambientLightSensor?.currentLux?.collectAsState()?.value ?: 0f
-                val logLines by EventLog.lastLines.collectAsState()
                 val exportInfo = remember { mutableStateOf<String?>(null) }
 
                 SettingsScreen(
@@ -94,7 +93,6 @@ class MainActivity : ComponentActivity() {
                         TimeBasedController.Source.ESTIMATED -> "geschätzt aus der Zeitzone (noch nie GPS)"
                         else -> "keine"
                     },
-                    logLines = logLines,
                     exportInfo = exportInfo.value,
                     extensionReady = ext != null,
                     actions = SettingsActions(
