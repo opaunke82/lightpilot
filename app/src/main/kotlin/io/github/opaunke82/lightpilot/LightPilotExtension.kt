@@ -506,6 +506,14 @@ class LightPilotExtension : KarooExtension(EXTENSION_ID, BuildConfig.VERSION_NAM
         }
     }
 
+    /** "Nach Bluetooth-Lichtern suchen" on the settings page. */
+    fun rescanBle() {
+        if (!settingsUiActive) return
+        Timber.d("$TAG: BLE rescan requested")
+        karooSystem.dispatch(RequestBluetooth(extension))
+        magicshineController.rescan()
+    }
+
     private fun stopBleScanIfDone() {
         if (!settingsUiActive) magicshineController.stopDiscovery()
     }
