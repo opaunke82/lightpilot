@@ -14,6 +14,8 @@ import android.text.style.ForegroundColorSpan
 import android.widget.RemoteViews
 import io.github.opaunke82.lightpilot.LightPilotExtension
 import io.github.opaunke82.lightpilot.R
+import io.github.opaunke82.lightpilot.core.Beam
+import io.github.opaunke82.lightpilot.core.MODE_OFF
 import io.github.opaunke82.lightpilot.core.ManualMode
 import io.github.opaunke82.lightpilot.core.RidePhase
 import io.github.opaunke82.lightpilot.core.Zone
@@ -40,6 +42,7 @@ import timber.log.Timber
 
 private const val ACTION_MANUAL_CYCLE = "io.github.opaunke82.lightpilot.MANUAL_CYCLE"
 private const val ACTION_FRONT_CYCLE = "io.github.opaunke82.lightpilot.FRONT_CYCLE"
+private const val ACTION_BEAM_TOGGLE = "io.github.opaunke82.lightpilot.BEAM_TOGGLE"
 
 private val RED = Color.parseColor("#B71C1C")
 private val GREY = Color.parseColor("#9E9E9E")
@@ -142,6 +145,8 @@ fun shortModeName(mode: String?): String = when {
     mode == "STEADY5" -> "gedimmt"
     mode == "SLOW_FLASH" -> "Night Flash"
     mode == "FAST_FLASH" -> "Day Flash"
+    mode.startsWith("LOW_") -> "Abblend " + mode.removePrefix("LOW_") + " %"
+    mode.startsWith("HIGH_") -> "Fern " + mode.removePrefix("HIGH_") + " %"
     mode.startsWith("STEADY_") -> mode.removePrefix("STEADY_") + " %"
     mode.startsWith("FLASH_") -> "Blinken " + mode.removePrefix("FLASH_") + " %"
     else -> mode
@@ -190,6 +195,59 @@ class FrontLightDataType(private val ext: LightPilotExtension) :
     }
 }
 
+/** Beam field: low or high beam of the front light. Tap switches; while off it only preselects. */
+class BeamDataType(private val ext: LightPilotExtension) :
+    DataTypeImpl(LightPilotExtension.EXTENSION_ID, "beam") {
+
+    override fun startStream(emitter: Emitter<StreamState>) {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        scope.launch {
+            ext.engine.status.map { s -> frontWithBeam(s)?.beam?.ordinal?.toDouble() ?: -1.0 }
+                .distinctUntilChanged()
+                .collect { value ->
+                    emitter.onNext(StreamState.Streaming(DataPoint(dataTypeId = dataTypeId, values = mapOf("beam" to value))))
+                }
+        }
+        emitter.setCancellable { scope.cancel() }
+    }
+
+    override fun startView(context: Context, config: ViewConfig, emitter: ViewEmitter) {
+        emitter.onNext(UpdateGraphicConfig(showHeader = false))
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+        scope.launch {
+            ext.engine.status.collect { s ->
+                val views = RemoteViews(context.packageName, R.layout.field_view)
+                val front = frontWithBeam(s)
+                views.setTextViewText(R.id.field_title, "Abblend/Fern")
+                if (front == null) {
+                    views.setTextViewText(R.id.field_main, "–")
+                    views.setTextViewText(R.id.field_sub, "kein Licht mit Fernlicht")
+                } else {
+                    views.setTextViewText(R.id.field_main, if (front.beam == Beam.HIGH) "Fernlicht" else "Abblend")
+                    val off = front.desired == null || front.desired == MODE_OFF
+                    views.setTextViewText(
+                        R.id.field_sub,
+                        when {
+                            !front.connected -> "getrennt"
+                            off -> "aus · vorgewählt"
+                            else -> "Tippen: umschalten"
+                        },
+                    )
+                }
+                views.setTextColor(R.id.field_sub, GREY)
+                if (ext.isRideActive || s.simulation) {
+                    views.setOnClickPendingIntent(R.id.field_root, tapIntent(context, ACTION_BEAM_TOGGLE, 2))
+                }
+                emitter.updateView(views)
+            }
+        }
+        emitter.setCancellable { scope.cancel() }
+    }
+
+    private fun frontWithBeam(s: EngineStatus) =
+        s.lights.firstOrNull { it.setup.role == LightRole.FRONT && it.beam != null }
+}
+
 class TapReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         Timber.d("TapReceiver: ${intent.action}")
@@ -197,6 +255,7 @@ class TapReceiver : BroadcastReceiver() {
         when (intent.action) {
             ACTION_MANUAL_CYCLE -> engine.manualCycle()
             ACTION_FRONT_CYCLE -> engine.frontCycle()
+            ACTION_BEAM_TOGGLE -> engine.beamToggle()
         }
         LightPilotExtension.getInstance()?.tapFeedback()
     }

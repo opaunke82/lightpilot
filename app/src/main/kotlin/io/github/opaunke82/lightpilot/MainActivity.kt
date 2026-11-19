@@ -114,6 +114,7 @@ class MainActivity : ComponentActivity() {
                         setManual = { ext?.engine?.setManual(it) },
                         simulateZone = { ext?.engine?.simulateZone(it) },
                         frontCycle = { ext?.engine?.frontCycle() },
+                        beamToggle = { ext?.engine?.beamToggle() },
                         factoryReset = {
                             ext?.factoryReset()
                             EventLog.clear()

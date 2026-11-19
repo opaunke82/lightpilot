@@ -4,6 +4,8 @@ import io.github.opaunke82.lightpilot.LightPilotExtension
 import io.github.opaunke82.lightpilot.ant.LightMode
 import io.github.opaunke82.lightpilot.ble.MagicshineDeviceConfig
 import io.github.opaunke82.lightpilot.ble.MagicshineDeviceModeProvider
+import io.github.opaunke82.lightpilot.ble.magicshineModeName
+import io.github.opaunke82.lightpilot.core.Beam
 import io.github.opaunke82.lightpilot.core.LightConfig
 import io.github.opaunke82.lightpilot.core.MODE_OFF
 import io.github.opaunke82.lightpilot.core.Role
@@ -65,6 +67,16 @@ data class LightSetup(
                     warnMode = LightMode.FAST_FLASH.karooName,
                     radarWarning = true,
                     saverNightMode = LightMode.STEADY_LOW.karooName,
+                )
+                protocol == LightProtocol.BLE && isTwoGroupMagicshine(deviceName) -> LightSetup(
+                    deviceId, deviceName, protocol, role,
+                    dayMode = MODE_OFF,
+                    nightMode = "LOW_60",
+                    warnMode = "FLASH_100",
+                    pelotonWarnMode = "LOW_100",
+                    radarWarning = false,
+                    saverNightMode = "LOW_30",
+                    fieldModes = DEFAULT_BEAM_FIELD_MODES,
                 )
                 protocol == LightProtocol.BLE -> LightSetup(
                     deviceId, deviceName, protocol, role,
@@ -174,5 +186,45 @@ fun modeProviderFor(protocol: LightProtocol, deviceId: String? = null): LightMod
 
 fun modeDisplayName(protocol: LightProtocol, deviceId: String?, modeId: String?): String {
     if (modeId == null) return "–"
-    return modeProviderFor(protocol, deviceId).availableModes().find { it.id == modeId }?.displayName ?: modeId
+    return modeProviderFor(protocol, deviceId).availableModes().find { it.id == modeId }?.displayName
+        ?: if (protocol == LightProtocol.BLE) magicshineModeName(modeId) else modeId
+}
+
+/** Magicshine lamps with two light groups (low and high beam) are named "M2-…". */
+fun isTwoGroupMagicshine(deviceName: String): Boolean = deviceName.getOrNull(1) != '1'
+
+/** Front field default for lamps with low and high beam. */
+val DEFAULT_BEAM_FIELD_MODES = listOf("LOW_30", "LOW_60", "LOW_100", "HIGH_50", "HIGH_100", MODE_OFF)
+
+fun LightSetup.hasBeams(): Boolean =
+    (fieldModes + listOf(dayMode, nightMode)).any { Beam.of(it) != null }
+
+/**
+ * Up to v0.1.x a two-group Magicshine was set with "STEADY_x", which switched its high beam.
+ * From v0.2.0 the modes name the group; old settings start in low beam (user's wish:
+ * never start with high beam). The field steps become the new default list.
+ */
+fun AppSettings.migrated(): AppSettings {
+    var changed = false
+    val lights = lights.map { l ->
+        if (l.protocol != LightProtocol.BLE || !isTwoGroupMagicshine(l.deviceName)) return@map l
+        fun m(mode: String) = if (mode.startsWith("STEADY_")) "LOW_" + mode.removePrefix("STEADY_") else mode
+        val fieldModes = if (l.fieldModes.any { it.startsWith("STEADY_") }) {
+            DEFAULT_BEAM_FIELD_MODES.filter { it != MODE_OFF || MODE_OFF in l.fieldModes }
+        } else {
+            l.fieldModes
+        }
+        val n = l.copy(
+            dayMode = m(l.dayMode),
+            nightMode = m(l.nightMode),
+            warnMode = m(l.warnMode),
+            pelotonWarnMode = m(l.pelotonWarnMode),
+            saverDayMode = l.saverDayMode?.let { m(it) },
+            saverNightMode = l.saverNightMode?.let { m(it) },
+            fieldModes = fieldModes,
+        )
+        if (n != l) changed = true
+        n
+    }
+    return if (changed) copy(lights = lights) else this
 }

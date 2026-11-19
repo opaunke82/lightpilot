@@ -74,6 +74,7 @@ class SettingsActions(
     val setManual: (ManualMode) -> Unit,
     val simulateZone: (Zone?) -> Unit,
     val frontCycle: () -> Unit,
+    val beamToggle: () -> Unit,
     val exportLog: () -> Unit,
     val factoryReset: () -> Unit,
 )
@@ -504,7 +505,11 @@ private fun TestBlock(status: EngineStatus, pelotonEnabled: Boolean, actions: Se
             ChoiceButton("Aus", status.manual == ManualMode.OFF, riding, w) { actions.setManual(ManualMode.OFF) }
             ChoiceButton("Hart aus", status.manual == ManualMode.HARD_OFF, riding, w) { actions.setManual(ManualMode.HARD_OFF) }
         }
-        ChoiceButton("Frontlicht: nächste Stufe", selected = false, enabled = riding, modifier = wide) { actions.frontCycle() }
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            val w = Modifier.weight(1f)
+            ChoiceButton("Frontlicht\nnächste Stufe", selected = false, enabled = riding, modifier = w) { actions.frontCycle() }
+            ChoiceButton("Abblend/\nFernlicht", selected = false, enabled = riding, modifier = w) { actions.beamToggle() }
+        }
     }
 
     SimGroup(

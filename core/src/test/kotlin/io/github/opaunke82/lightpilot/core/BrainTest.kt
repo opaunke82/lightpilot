@@ -253,6 +253,65 @@ class BrainTest {
         assertEquals("STEADY_25", Brain.decide(s, front, noWindow, 10_000).mode)
     }
 
+    private val evoBeams = evo.copy(
+        nightMode = "LOW_60",
+        fieldModes = listOf("LOW_30", "LOW_60", "LOW_100", "HIGH_50", "HIGH_100", MODE_OFF),
+    )
+
+    @Test
+    fun beamToggleSwitchesAndRemembersPerBeam() {
+        var s = run(BrainEvent.RideChanged(RidePhase.RECORDING, 0), BrainEvent.ZoneChanged(Zone.NIGHT))
+        fun toggle(at: Long): String? {
+            s = run(BrainEvent.BeamToggle(evoBeams, at), from = s)
+            return mode(s, evoBeams, at)
+        }
+        fun cycle(at: Long): String? {
+            s = run(BrainEvent.FieldCycle(evoBeams, at), from = s)
+            return mode(s, evoBeams, at)
+        }
+        assertEquals("LOW_60", mode(s, evoBeams, 500))
+        // High beam starts at its highest ticked step, low beam returns to where it was.
+        assertEquals("HIGH_100", toggle(1_000))
+        assertEquals("LOW_60", toggle(2_000))
+        assertEquals("HIGH_100", toggle(3_000))
+        // The brightness field cycles within the high beam (break rule first: off).
+        assertEquals(MODE_OFF, cycle(3_500))
+        assertEquals("HIGH_50", cycle(4_000))
+        assertEquals("HIGH_100", cycle(4_500))
+        assertEquals(MODE_OFF, cycle(5_000))
+        assertEquals("HIGH_50", cycle(5_500))
+        // Back to low beam: the last low beam step.
+        assertEquals("LOW_60", toggle(6_000))
+        // High beam remembers 50 % now.
+        assertEquals("HIGH_50", toggle(7_000))
+    }
+
+    @Test
+    fun beamToggleOnlyPreselectsWhileOff() {
+        var s = run(BrainEvent.RideChanged(RidePhase.RECORDING, 0))
+        // By day the front is off: the toggle changes nothing at the light.
+        s = run(BrainEvent.BeamToggle(evoBeams, 1_000), from = s)
+        assertEquals(MODE_OFF, mode(s, evoBeams, 1_000))
+        assertEquals(Beam.HIGH, Brain.activeBeam(s, evoBeams, settings, 1_000))
+        // The brightness field then switches on in the preselected beam.
+        s = run(BrainEvent.FieldCycle(evoBeams, 10_000), from = s)
+        assertEquals("HIGH_50", mode(s, evoBeams, 10_000))
+        // Day/night change ends the choice: night mode in low beam again.
+        s = run(BrainEvent.ZoneChanged(Zone.NIGHT), from = s)
+        assertEquals("LOW_60", mode(s, evoBeams, 20_000))
+        assertEquals(Beam.LOW, Brain.activeBeam(s, evoBeams, settings, 20_000))
+    }
+
+    @Test
+    fun beamDefaultsToLowBeam() {
+        var s = run(BrainEvent.RideChanged(RidePhase.RECORDING, 0))
+        assertEquals(Beam.LOW, Brain.activeBeam(s, evoBeams, settings, 0))
+        s = run(BrainEvent.FieldCycle(evoBeams, 10_000), from = s)
+        assertEquals("LOW_30", mode(s, evoBeams, 10_000))
+        // The rear light has no beams.
+        assertEquals(null, Brain.activeBeam(s, varia, settings, 10_000))
+    }
+
     @Test
     fun pelotonSwitchedOffActsLikeAutomatic() {
         val off = settings.copy(pelotonEnabled = false)

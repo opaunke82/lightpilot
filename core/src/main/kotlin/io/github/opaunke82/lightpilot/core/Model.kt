@@ -109,3 +109,19 @@ enum class Reason {
 
 /** Desired mode for one light. [mode] null means: do not control this light now. */
 data class Decision(val mode: String?, val reason: Reason)
+
+/**
+ * Light group of a lamp with low and high beam (Magicshine EVO: group 1 = low, group 2 = high).
+ * Modes of such a lamp are written "LOW_<percent>" and "HIGH_<percent>".
+ */
+enum class Beam(val prefix: String) {
+    LOW("LOW_"), HIGH("HIGH_");
+
+    fun other(): Beam = if (this == LOW) HIGH else LOW
+
+    companion object {
+        fun of(mode: String?): Beam? = entries.firstOrNull { mode != null && mode.startsWith(it.prefix) }
+
+        fun percentOf(mode: String?): Int? = of(mode)?.let { mode!!.removePrefix(it.prefix).toIntOrNull() }
+    }
+}

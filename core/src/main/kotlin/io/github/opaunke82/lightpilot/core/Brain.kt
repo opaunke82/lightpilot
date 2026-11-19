@@ -17,7 +17,14 @@ data class BrainState(
     val batteryPct: Map<String, Int> = emptyMap(),
     /** Time of the last data field tap per light (cycle window). */
     val fieldTapMs: Map<String, Long> = emptyMap(),
-)
+    /** Beam chosen with the beam field per light (also while the light is off: preselection). */
+    val beam: Map<String, Beam> = emptyMap(),
+    /** Last mode used per light and beam ("<id>/<beam>"), for switching back and forth. */
+    val beamLast: Map<String, String> = emptyMap(),
+) {
+    /** Front field choices end together: zone change, new ride, manual change. */
+    fun withoutFieldChoices() = copy(pins = emptyMap(), beam = emptyMap(), beamLast = emptyMap())
+}
 
 data class RadarState(
     /** Last sample showed a vehicle at or above the threshold. */
@@ -54,6 +61,13 @@ sealed interface BrainEvent {
      * a tap after a longer break switches the light off first (if "off" is in the cycle).
      */
     data class FieldCycle(val light: LightConfig, val nowMs: Long = 0) : BrainEvent
+
+    /**
+     * Beam field tap: switch between low and high beam. A light that is on changes at once
+     * (to the last mode used in that beam, high beam first at its highest ticked step);
+     * a light that is off only gets the beam preselected.
+     */
+    data class BeamToggle(val light: LightConfig, val nowMs: Long = 0) : BrainEvent
     data class Battery(val lightId: String, val pct: Int?) : BrainEvent
 }
 
@@ -77,9 +91,43 @@ object Brain {
      * A manual change ends per-light choices (front brightness from the field, changes on the
      * light), except between Automatik and Peloton: both are automatic, so the choices stay.
      */
-    private fun pinsAfterManualChange(state: BrainState, next: ManualMode): Map<String, Pin> {
+    private fun afterManualChange(state: BrainState, next: ManualMode): BrainState {
         val automatic = setOf(ManualMode.AUTO, ManualMode.PELOTON)
-        return if (state.manual in automatic && next in automatic) state.pins else emptyMap()
+        val kept = if (state.manual in automatic && next in automatic) state else state.withoutFieldChoices()
+        return kept.copy(manual = next)
+    }
+
+    /** Beam the front light is in or preselected for; null for lights without beams. */
+    fun activeBeam(state: BrainState, light: LightConfig, settings: Settings, nowMs: Long): Beam? {
+        if (!light.hasBeams()) return null
+        return state.beam[light.id]
+            ?: Beam.of(decide(state, light, settings, nowMs).mode)
+            ?: Beam.of(state.pins[light.id]?.mode)
+            ?: Beam.LOW
+    }
+
+    private fun LightConfig.hasBeams() =
+        (fieldModes + listOf(dayMode, nightMode)).any { Beam.of(it) != null }
+
+    private fun beamKey(id: String, beam: Beam) = "$id/${beam.name}"
+
+    private fun onBeamToggle(state: BrainState, event: BrainEvent.BeamToggle, settings: Settings): BrainState {
+        val light = event.light
+        val current = activeBeam(state, light, settings, event.nowMs) ?: return state
+        val target = current.other()
+        val shown = decide(state, light, settings, event.nowMs).mode
+        var s = state.copy(beam = state.beam + (light.id to target))
+        if (Beam.of(shown) == current) s = s.copy(beamLast = s.beamLast + (beamKey(light.id, current) to shown!!))
+        if (shown == null || shown == MODE_OFF) return s
+        val mode = s.beamLast[beamKey(light.id, target)] ?: firstModeOf(light, target)
+        return s.copy(pins = s.pins + (light.id to Pin(mode, PinSource.FIELD)))
+    }
+
+    /** High beam: highest ticked step. Low beam: the night mode, else the highest ticked step. */
+    private fun firstModeOf(light: LightConfig, beam: Beam): String {
+        if (beam == Beam.LOW && Beam.of(light.nightMode) == Beam.LOW) return light.nightMode
+        return light.fieldModes.filter { Beam.of(it) == beam }.maxByOrNull { Beam.percentOf(it) ?: 0 }
+            ?: (beam.prefix + "100")
     }
 
     fun reduce(state: BrainState, event: BrainEvent, settings: Settings): BrainState = when (event) {
@@ -89,10 +137,9 @@ object Brain {
             if (event.zone == state.zone) state
             // A zone change ends every manual intervention (M3). Peloton is no intervention
             // in the lights but a riding situation, so it stays.
-            else state.copy(
+            else state.withoutFieldChoices().copy(
                 zone = event.zone,
                 manual = if (state.manual == ManualMode.PELOTON) ManualMode.PELOTON else ManualMode.AUTO,
-                pins = emptyMap(),
             )
 
         is BrainEvent.RadarSample -> {
@@ -106,18 +153,21 @@ object Brain {
             )
         }
 
-        BrainEvent.ManualCycle -> state.manual.next(settings.pelotonEnabled).let { next ->
-            state.copy(manual = next, pins = pinsAfterManualChange(state, next))
-        }
+        BrainEvent.ManualCycle -> afterManualChange(state, state.manual.next(settings.pelotonEnabled))
 
-        is BrainEvent.ManualSet -> state.copy(manual = event.mode, pins = pinsAfterManualChange(state, event.mode))
+        is BrainEvent.ManualSet -> afterManualChange(state, event.mode)
 
         is BrainEvent.ExternalChange ->
             state.copy(pins = state.pins + (event.lightId to Pin(event.mode, PinSource.EXTERNAL)))
 
+        is BrainEvent.BeamToggle -> onBeamToggle(state, event, settings)
+
         is BrainEvent.FieldCycle -> {
             val light = event.light
-            val modes = light.fieldModes
+            // With beams the cycle runs through the steps of the active beam only.
+            val beam = activeBeam(state, light, settings, event.nowMs)
+            val ofBeam = light.fieldModes.filter { it == MODE_OFF || Beam.of(it) == beam }
+            val modes = if (beam != null && ofBeam.any { it != MODE_OFF }) ofBeam else light.fieldModes
             if (modes.isEmpty()) {
                 state
             } else {
@@ -141,9 +191,12 @@ object Brain {
                 if (next == null) {
                     state
                 } else {
+                    val nextBeam = Beam.of(next)
                     state.copy(
                         pins = state.pins + (light.id to Pin(next, PinSource.FIELD)),
                         fieldTapMs = state.fieldTapMs + (light.id to event.nowMs),
+                        beam = if (nextBeam != null) state.beam + (light.id to nextBeam) else state.beam,
+                        beamLast = if (nextBeam != null) state.beamLast + (beamKey(light.id, nextBeam) to next) else state.beamLast,
                     )
                 }
             }
@@ -159,23 +212,21 @@ object Brain {
         val new = event.phase
         if (old == new) return state
         return when (new) {
-            RidePhase.IDLE -> state.copy(
+            RidePhase.IDLE -> state.withoutFieldChoices().copy(
                 phase = new,
                 autoPauseSinceMs = null,
                 rideEnded = old != RidePhase.IDLE,
                 manual = ManualMode.AUTO,
-                pins = emptyMap(),
                 radar = RadarState(),
             )
             RidePhase.RECORDING -> {
                 val freshRide = old == RidePhase.IDLE
-                state.copy(
+                (if (freshRide) state.withoutFieldChoices() else state).copy(
                     phase = new,
                     autoPauseSinceMs = null,
                     rideEnded = false,
                     // A new ride starts in automatic mode (A1).
                     manual = if (freshRide) ManualMode.AUTO else state.manual,
-                    pins = if (freshRide) emptyMap() else state.pins,
                 )
             }
             RidePhase.PAUSED_AUTO -> state.copy(phase = new, autoPauseSinceMs = event.nowMs)

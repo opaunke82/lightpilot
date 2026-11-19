@@ -29,7 +29,7 @@ class PreferencesRepository(private val context: Context) {
             AppSettings()
         } else {
             try {
-                json.decodeFromString(AppSettings.serializer(), raw)
+                json.decodeFromString(AppSettings.serializer(), raw).migrated()
             } catch (e: Exception) {
                 Timber.e(e, "Settings could not be read, using defaults")
                 AppSettings()
