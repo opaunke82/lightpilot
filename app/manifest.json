@@ -3,9 +3,9 @@
   "packageName": "io.github.opaunke82.lightpilot",
   "iconUrl": "https://raw.githubusercontent.com/opaunke82/lightpilot/main/docs/icon.svg",
   "latestApkUrl": "https://github.com/opaunke82/lightpilot/releases/latest/download/lightpilot.apk",
-  "latestVersion": "0.1.5",
-  "latestVersionCode": 7,
+  "latestVersion": "0.1.6",
+  "latestVersionCode": 8,
   "developer": "opaunke82",
   "description": "Lichtsteuerung für Garmin Varia (ANT+) und Magicshine EVO 1700 (Bluetooth): nachts blinken, tagsüber nur bei Annäherung, Sparmodus, Pause-Regeln.",
-  "releaseNotes": "Varia gilt nur als verbunden, wenn das Radar Daten liefert; Tag/Nacht ohne GPS-Fix; aktuelle Lichtnamen; Werkseinstellungen; aufgeräumtes Protokoll."
+  "releaseNotes": "Peloton-Modus (Radar-Warnung dauerhaft statt blinkend), Bluetooth-Suche in der App, Magicshine verbindet sich zuverlässiger und lässt sich nach dem Entfernen neu einrichten."
 }

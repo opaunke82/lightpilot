@@ -12,13 +12,18 @@ enum class RidePhase { IDLE, RECORDING, PAUSED_AUTO, PAUSED_MANUAL }
 
 /**
  * Global manual setting, cycled from the data field.
- * AUTO -> ON -> OFF -> HARD_OFF -> AUTO.
+ * AUTO -> PELOTON -> ON -> OFF -> HARD_OFF -> AUTO (PELOTON only if offered).
+ * PELOTON is automatic mode, except that the radar warning uses a steady mode
+ * instead of flashing (riders behind are not dazzled by a flashing light).
  * HARD_OFF is the only setting that also suppresses the radar warning.
  */
 enum class ManualMode {
-    AUTO, ON, OFF, HARD_OFF;
+    AUTO, PELOTON, ON, OFF, HARD_OFF;
 
-    fun next(): ManualMode = entries[(ordinal + 1) % entries.size]
+    fun next(pelotonOffered: Boolean = true): ManualMode {
+        val n = entries[(ordinal + 1) % entries.size]
+        return if (n == PELOTON && !pelotonOffered) n.next(pelotonOffered) else n
+    }
 }
 
 /** Where a per-light pinned mode came from. */
@@ -44,6 +49,8 @@ data class LightConfig(
     val nightMode: String = MODE_OFF,
     /** Mode while the radar warns. Only used if [radarWarning] is true. */
     val warnMode: String = "FAST_FLASH",
+    /** Mode while the radar warns in peloton mode: steady instead of flashing. */
+    val pelotonWarnMode: String = "STEADY4",
     val radarWarning: Boolean = role == Role.REAR,
     /** Replacement modes when the battery is low and the saver is on. null = keep normal mode. */
     val saverDayMode: String? = null,
@@ -73,6 +80,8 @@ data class Settings(
     val batterySaverThresholdPct: Int = 20,
     /** Switch all lights off when the ride ends. */
     val offAfterRide: Boolean = true,
+    /** Peloton mode is offered on the data field. Off: it is skipped and acts like automatic. */
+    val pelotonEnabled: Boolean = true,
 )
 
 /** Why a light gets its mode. Shown on the status page and written to the log. */
@@ -83,6 +92,7 @@ enum class Reason {
     HARD_OFF,
     LONG_AUTO_PAUSE,
     RADAR,
+    RADAR_PELOTON,
     PINNED_EXTERNAL,
     PINNED_FIELD,
     MANUAL_ON,

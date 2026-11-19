@@ -146,6 +146,9 @@ fun LightDetailDialog(
                             ModeRow("Warnung", setup.warnMode, modes, tester) {
                                 onUpdate(setup.copy(warnMode = it))
                             }
+                            ModeRow("Warnung Peloton", setup.pelotonWarnMode, modes, tester) {
+                                onUpdate(setup.copy(pelotonWarnMode = it))
+                            }
                         }
                     }
 

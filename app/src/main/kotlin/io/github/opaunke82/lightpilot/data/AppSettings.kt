@@ -34,6 +34,8 @@ data class LightSetup(
     val dayMode: String = MODE_OFF,
     val nightMode: String = MODE_OFF,
     val warnMode: String = LightMode.FAST_FLASH.karooName,
+    /** Radar warning in peloton mode: steady instead of flashing. */
+    val pelotonWarnMode: String = LightMode.STEADY_HIGH.karooName,
     val radarWarning: Boolean = false,
     val saverDayMode: String? = null,
     val saverNightMode: String? = null,
@@ -45,6 +47,7 @@ data class LightSetup(
         dayMode = dayMode,
         nightMode = nightMode,
         warnMode = warnMode,
+        pelotonWarnMode = pelotonWarnMode,
         radarWarning = radarWarning && role == LightRole.REAR,
         saverDayMode = saverDayMode,
         saverNightMode = saverNightMode,
@@ -68,6 +71,7 @@ data class LightSetup(
                     dayMode = MODE_OFF,
                     nightMode = "STEADY_50",
                     warnMode = "FLASH_100",
+                    pelotonWarnMode = "STEADY_100",
                     radarWarning = false,
                     saverNightMode = "STEADY_10",
                     fieldModes = listOf("STEADY_25", "STEADY_50", "STEADY_100"),
@@ -100,6 +104,8 @@ data class AppSettings(
     val batterySaverThresholdPct: Int = 20,
     val offAfterRide: Boolean = true,
     val zoneNotifications: Boolean = true,
+    /** Offer the peloton mode on the data field. */
+    val pelotonEnabled: Boolean = true,
 ) {
     fun toCore() = Settings(
         radarMinThreatLevel = radarMinThreatLevel.coerceIn(1, 3),
@@ -109,6 +115,7 @@ data class AppSettings(
         batterySaverEnabled = batterySaverEnabled,
         batterySaverThresholdPct = batterySaverThresholdPct.coerceIn(5, 50),
         offAfterRide = offAfterRide,
+        pelotonEnabled = pelotonEnabled,
     )
 
     fun withLight(setup: LightSetup?, deviceId: String): AppSettings =

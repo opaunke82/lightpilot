@@ -79,6 +79,7 @@ fun reasonLabel(reason: Reason): String = when (reason) {
     Reason.HARD_OFF -> "Hart aus"
     Reason.LONG_AUTO_PAUSE -> "lange Auto-Pause"
     Reason.RADAR -> "Radar-Warnung"
+    Reason.RADAR_PELOTON -> "Radar-Warnung (Peloton)"
     Reason.PINNED_EXTERNAL -> "von außen geändert"
     Reason.PINNED_FIELD -> "über Datenfeld gewählt"
     Reason.MANUAL_ON -> "manuell an"
@@ -175,6 +176,14 @@ fun SettingsScreen(
             SwitchRow("Erst bei schnellem Fahrzeug warnen", settings.radarMinThreatLevel >= 2) {
                 actions.save(settings.copy(radarMinThreatLevel = if (it) 2 else 1))
             }
+            SwitchRow("Peloton-Modus im Datenfeld", settings.pelotonEnabled) {
+                actions.save(settings.copy(pelotonEnabled = it))
+            }
+            Note(
+                "Peloton: alles wie Automatik, nur leuchtet das Rücklicht bei einer Radar-Warnung dauerhaft " +
+                    "statt zu blinken (Stufe pro Licht unter „Lichter“ wählbar). Bleibt beim Tag/Nacht-Wechsel " +
+                    "erhalten, jede neue Fahrt beginnt mit Automatik.",
+            )
         }
 
         Section("Pause und Fahrtende") {
@@ -205,7 +214,7 @@ fun SettingsScreen(
         }
 
         Section("Test und Diagnose") {
-            TestBlock(status, actions)
+            TestBlock(status, settings.pelotonEnabled, actions)
             Spacer(Modifier.height(8.dp))
             OutlinedButton(onClick = actions.exportLog) { Text("Protokoll exportieren") }
             exportInfo?.let { Note("Gespeichert: $it") }
@@ -404,7 +413,7 @@ private fun SimGroup(title: String, hint: String, content: @Composable () -> Uni
 }
 
 @Composable
-private fun TestBlock(status: EngineStatus, actions: SettingsActions) {
+private fun TestBlock(status: EngineStatus, pelotonEnabled: Boolean, actions: SettingsActions) {
     SwitchRow("Simulationsmodus", status.simulation) { actions.setSimulation(it) }
     if (!status.simulation) {
         Note("Prüft die Logik am Tisch: Fahrt, Pausen, Tag/Nacht, Fahrzeug und Bedienung. Das echte Radar wird dabei ignoriert.")
@@ -447,12 +456,16 @@ private fun TestBlock(status: EngineStatus, actions: SettingsActions) {
 
     SimGroup(
         "4. Steuerung (wie Datenfeld)",
-        "Das Datenfeld schaltet reihum Automatik → An → Aus → Hart aus. Hier direkt wählbar. " +
-            "Ein Wechsel von Tag/Nacht setzt wieder auf Automatik.",
+        "Das Datenfeld schaltet reihum Automatik → " + (if (pelotonEnabled) "Peloton → " else "") +
+            "An → Aus → Hart aus. Hier direkt wählbar. Ein Wechsel von Tag/Nacht setzt wieder auf " +
+            "Automatik (Peloton bleibt). Peloton testen: wählen, dann unter 3. ein Fahrzeug melden.",
     ) {
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             val w = Modifier.weight(1f)
             ChoiceButton("Auto", status.manual == ManualMode.AUTO, riding, w) { actions.setManual(ManualMode.AUTO) }
+            ChoiceButton("Peloton", status.manual == ManualMode.PELOTON, riding && pelotonEnabled, w) {
+                actions.setManual(ManualMode.PELOTON)
+            }
             ChoiceButton("An", status.manual == ManualMode.ON, riding, w) { actions.setManual(ManualMode.ON) }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
