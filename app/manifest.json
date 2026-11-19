@@ -7,5 +7,5 @@
   "latestVersionCode": 8,
   "developer": "opaunke82",
   "description": "Lichtsteuerung für Garmin Varia (ANT+) und Magicshine EVO 1700 (Bluetooth): nachts blinken, tagsüber nur bei Annäherung, Sparmodus, Pause-Regeln.",
-  "releaseNotes": "Peloton-Modus (Radar-Warnung dauerhaft statt blinkend), Bluetooth-Suche in der App, Magicshine verbindet sich zuverlässiger und lässt sich nach dem Entfernen neu einrichten."
+  "releaseNotes": "Peloton-Modus (Radar-Warnung dauerhaft statt blinkend), Protokollfenster mit Filter, Bluetooth-Suche in der App, Magicshine verbindet sich zuverlässiger und lässt sich nach dem Entfernen neu einrichten."
 }

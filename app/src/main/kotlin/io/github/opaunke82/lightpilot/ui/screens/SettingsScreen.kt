@@ -216,7 +216,12 @@ fun SettingsScreen(
         Section("Test und Diagnose") {
             TestBlock(status, settings.pelotonEnabled, actions)
             Spacer(Modifier.height(8.dp))
-            OutlinedButton(onClick = actions.exportLog) { Text("Protokoll exportieren") }
+            var showLog by remember { mutableStateOf(false) }
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                OutlinedButton(onClick = { showLog = true }, modifier = Modifier.weight(1f)) { Text("Protokoll öffnen") }
+                OutlinedButton(onClick = actions.exportLog, modifier = Modifier.weight(1f)) { Text("Exportieren") }
+            }
+            if (showLog) LogViewer(onClose = { showLog = false })
             exportInfo?.let { Note("Gespeichert: $it") }
             Spacer(Modifier.height(8.dp))
             Text("Letzte Einträge", style = MaterialTheme.typography.labelMedium)

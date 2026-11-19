@@ -29,11 +29,21 @@ object EventLog {
         val line = "${format.format(Date())} ${tag ?: "-"}: $message"
         if (lines.size >= MAX_LINES) lines.removeFirst()
         lines.addLast(line)
+        version++
         _lastLines.value = lines.takeLast(30).reversed()
     }
 
+    /** Counts added lines, so the log window copies only when something changed. */
+    @Volatile var version = 0L
+        private set
+
+    /** Newest [max] lines, newest first (log window). */
+    @Synchronized
+    fun snapshot(max: Int): List<String> = lines.takeLast(max).reversed()
+
     @Synchronized
     fun clear() {
+        version++
         lines.clear()
         _lastLines.value = emptyList()
     }
