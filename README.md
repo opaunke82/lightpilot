@@ -3,23 +3,43 @@
 Karoo-Extension, die Fahrradlichter abhängig von Tageszeit, Radar und Fahrtzustand schaltet.
 Gebaut für das Garmin Varia RTL515 (ANT+) und das Magicshine EVO 1700 (Bluetooth) am Hammerhead Karoo 3.
 
-**Status: erste Testversion.** Die Entscheidungslogik ist mit Unit-Tests abgedeckt; das Zusammenspiel
-mit Karoo und Lichtern muss auf dem Gerät noch geprüft werden (siehe „Offene Punkte“).
+**Status:** im Alltagstest mit Varia RTL515 und EVO 1700 am Karoo 3. Die Steuerlogik ist mit
+Unit-Tests abgedeckt (`./gradlew :core:test`). Was sich je Version geändert hat, steht in den
+Release-Notes unter **Releases**, gegliedert in New, Update und Fix.
 
 ## Was es tut
 
-- **Nacht:** Rücklicht blinkt langsam (Night Flash), Frontlicht Abblendlicht.
+- **Nacht:** Rücklicht blinkt langsam (Night Flash), Frontlicht leuchtet mit der Nachtstufe.
 - **Tag:** Rücklicht aus, blinkt schnell, sobald das Radar ein Fahrzeug meldet; Frontlicht aus.
+- **Tag oder Nacht:** nach Sonnenauf- und -untergang, Nacht ab 30 min vor Sonnenuntergang
+  (beides einstellbar). Ohne GPS-Fix rechnet die App mit der letzten bekannten Position, gab es
+  noch nie GPS, mit einer Schätzung aus der Zeitzone. Die Sonnenzeiten werden täglich neu
+  berechnet. Optional zusätzlich mit dem Lichtsensor des Karoo.
 - **Haltezeit:** Nach dem letzten Fahrzeug bleibt die Warnung 3 s an (einstellbar 0–10 s).
 - **Watchdog:** Kommen 5 s lang keine Radardaten, endet die Warnung. Nichts bleibt hängen.
-- **Manuelle Eingriffe:** Datenfeld tippen schaltet reihum Automatik → An → Aus → Hart aus.
-  Änderungen über das Control Center oder die Taste am Licht übernimmt die App, statt dagegen zu arbeiten.
-  Jeder Eingriff gilt bis zum nächsten Tag/Nacht-Wechsel.
+- **Statusfeld:** Tippen schaltet reihum Automatik → Peloton → An → Aus → Hart aus.
+  An, Aus und Hart aus gelten bis zum nächsten Tag/Nacht-Wechsel, Peloton bleibt dabei erhalten.
+  Jede neue Fahrt beginnt mit Automatik. Änderungen über das Control Center oder die Taste am
+  Licht übernimmt die App, statt dagegen zu arbeiten.
+- **Peloton-Modus:** alles wie Automatik, nur leuchtet das Rücklicht bei einer Radar-Warnung
+  dauerhaft statt zu blinken, damit Mitfahrer nicht irritiert werden. Die Stufe ist pro Licht
+  wählbar („Warnung Peloton“, Standard: Dauerlicht hell). Global abschaltbar (Abschnitt „Radar“),
+  dann wird er im Statusfeld übersprungen.
+- **Frontlicht-Feld:** Tippen schaltet durch die beim Licht angehakten Stufen, optional mit Aus.
+  Pausenregel (Standard 5 s, einstellbar 0–10 s unter „Lichter“): Der erste Tipp nach einer Pause
+  schaltet eine leuchtende Lampe aus, eine ausgeschaltete auf die kleinste angehakte Stufe; danach
+  beginnt der Zyklus wieder von unten. Eine gewählte Stufe bleibt beim Wechsel zwischen Automatik
+  und Peloton erhalten.
 - **Pause:** Pause-Taste am Karoo schaltet Licht und Radar-Warnung sofort aus.
   Auto-Pause erst nach 2 min (einstellbar bis 5 min).
 - **Fahrtende:** Licht aus.
 - **Sparmodus:** Bei niedrigem Akku ein sparsamerer Modus (abschaltbar).
-- **Frontlicht-Datenfeld:** Tippen schaltet die Helligkeit reihum.
+- **Anzeige:** Die Varia gilt als verbunden, solange ihr Radar Daten liefert (der Karoo meldet
+  für das Licht selbst keinen Zustand). Die Magicshine bleibt auch im Standby per Bluetooth
+  verbunden und lässt sich von der App einschalten. Akku farbig: grün (Magicshine 100–50 %,
+  Varia neu/gut), gelb (49–20 %, Varia ok), rot (darunter, Varia niedrig/kritisch).
+- **Werkseinstellungen:** setzt Lichter-Zuordnung, Einstellungen, gespeicherte Position und
+  Protokoll zurück (mit Bestätigungsabfrage). Die Kopplung im Karoo bleibt.
 
 ### Priorität
 
@@ -29,7 +49,7 @@ Eine einzige Funktion (`core/.../Brain.kt`) entscheidet für jedes Licht, höchs
 2. Pause-Taste → aus, kein Radar
 3. Hart aus → aus, kein Radar
 4. Auto-Pause länger als eingestellt → aus, kein Radar
-5. Radar-Warnung inklusive Haltezeit
+5. Radar-Warnung inklusive Haltezeit, im Peloton-Modus dauerhaft statt blinkend
 6. Eingriff von außen oder über das Frontlicht-Feld
 7. Manuell An / Aus
 8. Tag/Nacht, ggf. mit Sparmodus
@@ -72,7 +92,9 @@ Ohne diese Secrets baut der Workflow eine Debug-Version; die muss vor jedem Upda
 
 ### 3. Release erstellen
 
-Auf GitHub **Releases → Draft a new release**, neuen Tag wie `v0.1.0` anlegen, veröffentlichen.
+Auf GitHub **Releases → Draft a new release**, den Tag (z. B. `v0.1.9`) über **Tag: Select tag**
+neu anlegen, nicht als Pre-Release markieren, veröffentlichen. Die Release-Notes nach
+**New** (neue Funktionen), **Update** (geänderte Funktionen) und **Fix** (Fehlerbehebungen) gliedern.
 Der Workflow hängt danach `lightpilot.apk` an das Release (dauert einige Minuten).
 
 ### 4. Auf den Karoo bringen
@@ -84,6 +106,8 @@ Auf dem Handy diesen Link lange drücken und mit der **Hammerhead Companion App*
 https://github.com/opaunke82/lightpilot/releases/latest/download/lightpilot.apk
 ```
 
+Die installierte Version steht ganz unten auf der Einstellungsseite von LightPilot.
+
 ### 5. Am Karoo einrichten
 
 1. Varia unter **Einstellungen → Sensoren** per **ANT+** koppeln. Es muss als Licht erscheinen
@@ -91,17 +115,40 @@ https://github.com/opaunke82/lightpilot/releases/latest/download/lightpilot.apk
    (Taste 8 s halten) und neu koppeln.
 2. **Auto Control** für das Licht ausschalten.
 3. Andere Licht-Extensions (KarooFirefly, LightONKaroo) deinstallieren oder beenden.
-4. LightPilot unter **Extensions** öffnen, Lichter antippen und Rolle wählen. Die Standardwerte
-   entsprechen dem Anforderungsprotokoll.
-5. Datenfelder **LightPilot** und **Frontlicht** in ein Fahrprofil legen.
+4. Magicshine einschalten. Sie darf nicht mit der Magicshine-App auf einem Handy verbunden sein,
+   sonst ist sie für den Karoo unsichtbar.
+5. LightPilot unter **Extensions** öffnen. Unter **Lichter** erscheinen die gefundenen Lichter gelb
+   („antippen zum Einrichten“); antippen und Rolle wählen (Varia: Rück, Magicshine: Front). Beim
+   Frontlicht die Stufen für das Datenfeld anhaken. Fehlt die Magicshine:
+   **Nach Bluetooth-Lichtern suchen**. Die Standardwerte entsprechen dem Anforderungsprotokoll.
+6. Datenfelder **LightPilot** und **Frontlicht** in ein Fahrprofil legen.
+
+## Bedienung während der Fahrt
+
+| | Anzeige | Tippen |
+| --- | --- | --- |
+| Datenfeld **LightPilot** | Tag/Nacht, Radar, Modus, Rücklicht und Akku; rot bei Radar-Warnung | Automatik → Peloton → An → Aus → Hart aus |
+| Datenfeld **Frontlicht** | aktuelle Stufe und Akku | nächste angehakte Stufe, Pausenregel siehe oben |
+
+Beide Aktionen gibt es auch als Zusatzaktion für eine Taste des Karoo
+(„Licht: Automatik / Peloton / An / Aus / Hart aus“, „Frontlicht: nächste Helligkeit“).
+Außerhalb einer Fahrt reagieren die Felder nicht auf Tippen.
 
 ## Testen
 
-Im Abschnitt **Test und Diagnose** der App den Simulationsmodus einschalten: Fahrt starten,
-„Fahrzeug 5 s“, Pausen und Datenfeld-Tipps lassen sich am Tisch durchspielen.
+Im Abschnitt **Test und Diagnose** der App den Simulationsmodus einschalten. Er spielt die
+Abläufe am Tisch durch, das echte Radar wird dabei ignoriert:
 
-Das Protokoll (Radarstufen, gesendete Befehle, gemeldete Modi) lässt sich exportieren und am
-Rechner holen:
+1. **Fahrt** starten und beenden
+2. **Tag oder Nacht:** Echt (nach Uhrzeit), Tag oder Nacht erzwingen
+3. **Radar:** ein Fahrzeug für 5 s melden
+4. **Steuerung** wie das Datenfeld: Auto, Peloton, An, Aus, Hart aus und Frontlicht
+5. **Pause:** Pause-Taste, Auto-Pause, Weiterfahren
+
+**Protokoll öffnen** zeigt die letzten 1000 Einträge im Vollbild, neueste oben, mit Filter
+(Alle, Steuerung, Magicshine, System) und Anhalten. **Exportieren** speichert das ganze
+Protokoll als Textdatei auf dem Karoo; am Rechner holen mit adb (unter Linux im Paket
+`android-tools`):
 
 ```fish
 adb pull /sdcard/Android/data/io.github.opaunke82.lightpilot/files/
@@ -109,15 +156,17 @@ adb pull /sdcard/Android/data/io.github.opaunke82.lightpilot/files/
 
 ## Offene Punkte
 
+- **Magicshine EVO 1700:** Fernlicht und das Auslesen des Lampenzustands (Statusmeldung `B1`:
+  an/aus, Stufe) folgen nach einem Bluetooth-Mitschnitt der Magicshine-App. Welche Stufe welchem
+  Lumenwert entspricht, ist ungeprüft.
 - **Rückmeldung des Varia:** Die App liest den gemeldeten Modus aus den LightParameters des Karoo.
   Ob der Karoo diese bei jeder Änderung schickt, ist ungeprüft. Im Protokoll: Zeilen „Reported mode“.
-- **Radar-Datenstrom:** Der Watchdog setzt voraus, dass der Karoo Radardaten laufend liefert,
-  auch ohne Fahrzeug. Im Protokoll prüfen; sonst Watchdog-Zeit erhöhen.
-- **EVO 1700:** Helligkeit in Prozent (Code aus KarooFirefly); welche Stufe welchem Lumenwert
-  entspricht, ist ungeprüft. Fernlicht folgt in Version 1.1 nach einem Bluetooth-Mitschnitt.
+- **Varia ohne Radar:** Die Verbindung der Varia wird über ihr Radar erkannt. Ist das Radar am
+  Karoo abgeschaltet und nur das Licht in Betrieb, zeigt die App sie als „nicht verbunden“.
 - **Inoffizielle Schnittstelle:** Das Schalten der ANT+-Lichter nutzt eine nicht dokumentierte
   Schnittstelle des Karoo. Ein Firmware-Update kann sie ändern.
 - **Bildschirm aus / Slower Processing:** Reaktion des Radars in diesem Zustand messen.
+- **Testprotokoll:** Ein ausführliches Testprotokoll für die Abläufe der Steuerung ist geplant.
 
 ## Lizenz
 
