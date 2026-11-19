@@ -138,11 +138,71 @@ class BrainTest {
     fun manualCycleOrder() {
         var s = BrainState()
         val seen = mutableListOf<ManualMode>()
-        repeat(4) {
+        repeat(5) {
             s = run(BrainEvent.ManualCycle, from = s)
             seen += s.manual
         }
+        assertEquals(
+            listOf(ManualMode.PELOTON, ManualMode.ON, ManualMode.OFF, ManualMode.HARD_OFF, ManualMode.AUTO),
+            seen,
+        )
+    }
+
+    @Test
+    fun manualCycleSkipsPelotonWhenSwitchedOff() {
+        val off = settings.copy(pelotonEnabled = false)
+        var s = BrainState()
+        val seen = mutableListOf<ManualMode>()
+        repeat(4) {
+            s = Brain.reduce(s, BrainEvent.ManualCycle, off)
+            seen += s.manual
+        }
         assertEquals(listOf(ManualMode.ON, ManualMode.OFF, ManualMode.HARD_OFF, ManualMode.AUTO), seen)
+    }
+
+    @Test
+    fun pelotonWarnsSteadyAndKeepsAutomatic() {
+        var s = run(
+            BrainEvent.RideChanged(RidePhase.RECORDING, 0),
+            BrainEvent.ManualSet(ManualMode.PELOTON),
+            BrainEvent.RadarSample(0, 0),
+        )
+        // By day the rear stays off as in automatic mode.
+        assertEquals(MODE_OFF, mode(s, varia, 100))
+        // Vehicle: steady instead of flashing, for the same hold time.
+        s = run(BrainEvent.RadarSample(1, 1_000), from = s)
+        assertEquals("STEADY4", mode(s, varia, 1_000))
+        s = run(BrainEvent.RadarSample(0, 2_000), from = s)
+        assertEquals("STEADY4", mode(s, varia, 3_900))
+        s = run(BrainEvent.RadarSample(0, 4_100), from = s)
+        assertEquals(MODE_OFF, mode(s, varia, 4_100))
+        // Night: normal night mode, peloton survives the zone change.
+        s = run(BrainEvent.ZoneChanged(Zone.NIGHT), from = s)
+        assertEquals(ManualMode.PELOTON, s.manual)
+        assertEquals("SLOW_FLASH", mode(s, varia, 5_000))
+        assertEquals("STEADY_50", mode(s, evo, 5_000))
+    }
+
+    @Test
+    fun pelotonSwitchedOffActsLikeAutomatic() {
+        val off = settings.copy(pelotonEnabled = false)
+        val s = listOf(
+            BrainEvent.RideChanged(RidePhase.RECORDING, 0),
+            BrainEvent.ManualSet(ManualMode.PELOTON),
+            BrainEvent.RadarSample(1, 1_000),
+        ).fold(BrainState()) { acc, e -> Brain.reduce(acc, e, off) }
+        assertEquals("FAST_FLASH", Brain.decide(s, varia, off, 1_000).mode)
+    }
+
+    @Test
+    fun pausesStillWinInPeloton() {
+        val s = run(
+            BrainEvent.RideChanged(RidePhase.RECORDING, 0),
+            BrainEvent.ManualSet(ManualMode.PELOTON),
+            BrainEvent.RadarSample(1, 1_000),
+            BrainEvent.RideChanged(RidePhase.PAUSED_MANUAL, 1_000),
+        )
+        assertEquals(MODE_OFF, mode(s, varia, 1_000))
     }
 
     @Test

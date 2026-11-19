@@ -61,7 +61,7 @@ sealed interface BrainEvent {
  *  2. manual pause (pause button) -> off, no radar
  *  3. HARD_OFF -> off, no radar
  *  4. auto-pause longer than the delay -> off, no radar
- *  5. radar warning (including hold time)
+ *  5. radar warning (including hold time), steady instead of flashing in peloton mode
  *  6. per-light pin (external change or data field)
  *  7. manual ON / OFF
  *  8. day/night zone, with battery saver
@@ -73,8 +73,13 @@ object Brain {
 
         is BrainEvent.ZoneChanged ->
             if (event.zone == state.zone) state
-            // A zone change ends every manual intervention (M3).
-            else state.copy(zone = event.zone, manual = ManualMode.AUTO, pins = emptyMap())
+            // A zone change ends every manual intervention (M3). Peloton is no intervention
+            // in the lights but a riding situation, so it stays.
+            else state.copy(
+                zone = event.zone,
+                manual = if (state.manual == ManualMode.PELOTON) ManualMode.PELOTON else ManualMode.AUTO,
+                pins = emptyMap(),
+            )
 
         is BrainEvent.RadarSample -> {
             val threat = event.threatLevel >= settings.radarMinThreatLevel
@@ -87,7 +92,7 @@ object Brain {
             )
         }
 
-        BrainEvent.ManualCycle -> state.copy(manual = state.manual.next(), pins = emptyMap())
+        BrainEvent.ManualCycle -> state.copy(manual = state.manual.next(settings.pelotonEnabled), pins = emptyMap())
 
         is BrainEvent.ManualSet -> state.copy(manual = event.mode, pins = emptyMap())
 
@@ -157,8 +162,10 @@ object Brain {
             return Decision(MODE_OFF, Reason.LONG_AUTO_PAUSE)
         }
 
+        val peloton = state.manual == ManualMode.PELOTON && settings.pelotonEnabled
         if (light.radarWarning && state.radar.isWarning(nowMs, settings)) {
-            return Decision(light.warnMode, Reason.RADAR)
+            return if (peloton) Decision(light.pelotonWarnMode, Reason.RADAR_PELOTON)
+            else Decision(light.warnMode, Reason.RADAR)
         }
 
         state.pins[light.id]?.let { pin ->
@@ -171,7 +178,7 @@ object Brain {
             ManualMode.ON -> Decision(withSaver(light.onMode, light.saverNightMode, saver), Reason.MANUAL_ON)
             ManualMode.OFF -> Decision(MODE_OFF, Reason.MANUAL_OFF)
             ManualMode.HARD_OFF -> Decision(MODE_OFF, Reason.HARD_OFF)
-            ManualMode.AUTO -> {
+            ManualMode.AUTO, ManualMode.PELOTON -> {
                 val (normal, saverMode) = when (state.zone) {
                     Zone.DAY -> light.dayMode to light.saverDayMode
                     Zone.NIGHT -> light.nightMode to light.saverNightMode

@@ -41,6 +41,7 @@ private val GREY = Color.parseColor("#9E9E9E")
 
 fun manualLabel(mode: ManualMode): String = when (mode) {
     ManualMode.AUTO -> "Automatik"
+    ManualMode.PELOTON -> "Peloton"
     ManualMode.ON -> "An"
     ManualMode.OFF -> "Aus"
     ManualMode.HARD_OFF -> "Hart aus"
