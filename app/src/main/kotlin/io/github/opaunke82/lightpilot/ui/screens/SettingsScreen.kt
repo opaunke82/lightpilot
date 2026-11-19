@@ -7,6 +7,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -105,7 +106,6 @@ fun SettingsScreen(
     sunrise: Calendar?,
     sunset: Calendar?,
     sunSource: String,
-    logLines: List<String>,
     exportInfo: String?,
     extensionReady: Boolean,
     actions: SettingsActions,
@@ -223,11 +223,6 @@ fun SettingsScreen(
             }
             if (showLog) LogViewer(onClose = { showLog = false })
             exportInfo?.let { Note("Gespeichert: $it") }
-            Spacer(Modifier.height(8.dp))
-            Text("Letzte Einträge", style = MaterialTheme.typography.labelMedium)
-            logLines.take(15).forEach {
-                Text(it, fontFamily = FontFamily.Monospace, fontSize = 10.sp, lineHeight = 12.sp)
-            }
         }
 
         Section("Zurücksetzen") {
@@ -402,12 +397,19 @@ private fun DayNightBlock(
 
 @Composable
 private fun ChoiceButton(text: String, selected: Boolean, enabled: Boolean = true, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    // Narrow padding and no automatic wrapping: three buttons per row fit on the Karoo.
+    // Two-line labels are written with an explicit line break.
+    val label: @Composable () -> Unit = {
+        Text(text, fontSize = 13.sp, softWrap = false, textAlign = TextAlign.Center, lineHeight = 15.sp)
+    }
     if (selected) {
-        Button(onClick = onClick, enabled = enabled, modifier = modifier) { Text(text, fontSize = 13.sp) }
+        Button(onClick = onClick, enabled = enabled, modifier = modifier, contentPadding = CHOICE_PADDING) { label() }
     } else {
-        OutlinedButton(onClick = onClick, enabled = enabled, modifier = modifier) { Text(text, fontSize = 13.sp) }
+        OutlinedButton(onClick = onClick, enabled = enabled, modifier = modifier, contentPadding = CHOICE_PADDING) { label() }
     }
 }
+
+private val CHOICE_PADDING = PaddingValues(horizontal = 4.dp, vertical = 8.dp)
 
 @Composable
 private fun SimGroup(title: String, hint: String, content: @Composable () -> Unit) {
@@ -489,8 +491,8 @@ private fun TestBlock(status: EngineStatus, pelotonEnabled: Boolean, actions: Se
         val paused = status.phase == RidePhase.PAUSED_MANUAL || status.phase == RidePhase.PAUSED_AUTO
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             val w = Modifier.weight(1f)
-            ChoiceButton("Pause-Taste", status.phase == RidePhase.PAUSED_MANUAL, riding, w) { actions.simulatePause(true) }
-            ChoiceButton("Auto-Pause", status.phase == RidePhase.PAUSED_AUTO, riding, w) { actions.simulatePause(false) }
+            ChoiceButton("Pause\nTaste", status.phase == RidePhase.PAUSED_MANUAL, riding, w) { actions.simulatePause(true) }
+            ChoiceButton("Auto\nPause", status.phase == RidePhase.PAUSED_AUTO, riding, w) { actions.simulatePause(false) }
         }
         ChoiceButton("Weiterfahren", selected = false, enabled = paused, modifier = wide) { actions.simulateResume() }
     }

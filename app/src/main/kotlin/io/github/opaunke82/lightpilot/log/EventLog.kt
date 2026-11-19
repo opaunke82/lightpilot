@@ -2,8 +2,6 @@ package io.github.opaunke82.lightpilot.log
 
 import android.content.Context
 import android.util.Log
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import timber.log.Timber
 import java.io.File
 import java.text.SimpleDateFormat
@@ -20,17 +18,12 @@ object EventLog {
     private val lines = ArrayDeque<String>(MAX_LINES)
     private val format = SimpleDateFormat("HH:mm:ss.SSS", Locale.GERMANY)
 
-    private val _lastLines = MutableStateFlow<List<String>>(emptyList())
-    /** Newest lines first, for the status page. */
-    val lastLines: StateFlow<List<String>> = _lastLines
-
     @Synchronized
     fun add(tag: String?, message: String) {
         val line = "${format.format(Date())} ${tag ?: "-"}: $message"
         if (lines.size >= MAX_LINES) lines.removeFirst()
         lines.addLast(line)
         version++
-        _lastLines.value = lines.takeLast(30).reversed()
     }
 
     /** Counts added lines, so the log window copies only when something changed. */
@@ -45,7 +38,6 @@ object EventLog {
     fun clear() {
         version++
         lines.clear()
-        _lastLines.value = emptyList()
     }
 
     /**
