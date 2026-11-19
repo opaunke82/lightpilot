@@ -25,7 +25,13 @@ Release-Notes unter **Releases**, gegliedert in New, Update und Fix.
   dauerhaft statt zu blinken, damit Mitfahrer nicht irritiert werden. Die Stufe ist pro Licht
   wählbar („Warnung Peloton“, Standard: Dauerlicht hell). Global abschaltbar (Abschnitt „Radar“),
   dann wird er im Statusfeld übersprungen.
-- **Frontlicht-Feld:** Tippen schaltet durch die beim Licht angehakten Stufen, optional mit Aus.
+- **Abblend- und Fernlicht (Magicshine EVO):** Beide Lichtgruppen sind getrennt einstellbar
+  (Abblend 10–100 %, Fernlicht 10–100 %, oder ein eigener Wert per Schieberegler). Standard ist
+  immer das Abblendlicht. Das Datenfeld **Abblend/Fern** wechselt zwischen beiden: Jedes Licht
+  merkt sich seine zuletzt genutzte Stufe, das Fernlicht beginnt mit seiner höchsten angehakten
+  Stufe. Ist die Lampe aus, wird nur vorgewählt.
+- **Frontlicht-Feld:** Tippen schaltet durch die beim Licht angehakten Stufen des aktiven Lichts
+  (Standard: Abblend 30/60/100, Fernlicht 50/100), optional mit Aus.
   Pausenregel (Standard 5 s, einstellbar 0–10 s unter „Lichter“): Der erste Tipp nach einer Pause
   schaltet eine leuchtende Lampe aus, eine ausgeschaltete auf die kleinste angehakte Stufe; danach
   beginnt der Zyklus wieder von unten. Eine gewählte Stufe bleibt beim Wechsel zwischen Automatik
@@ -119,19 +125,21 @@ Die installierte Version steht ganz unten auf der Einstellungsseite von LightPil
    sonst ist sie für den Karoo unsichtbar.
 5. LightPilot unter **Extensions** öffnen. Unter **Lichter** erscheinen die gefundenen Lichter gelb
    („antippen zum Einrichten“); antippen und Rolle wählen (Varia: Rück, Magicshine: Front). Beim
-   Frontlicht die Stufen für das Datenfeld anhaken. Fehlt die Magicshine:
+   Frontlicht die Stufen für das Datenfeld wählen, bei der Magicshine getrennt für Abblend- und Fernlicht. Fehlt die Magicshine:
    **Nach Bluetooth-Lichtern suchen**. Die Standardwerte entsprechen dem Anforderungsprotokoll.
-6. Datenfelder **LightPilot** und **Frontlicht** in ein Fahrprofil legen.
+6. Datenfelder **LightPilot**, **Frontlicht** und **Abblend/Fern** in ein Fahrprofil legen.
 
 ## Bedienung während der Fahrt
 
 | | Anzeige | Tippen |
 | --- | --- | --- |
 | Datenfeld **LightPilot** | Tag/Nacht, Radar, Modus, Rücklicht und Akku; rot bei Radar-Warnung | Automatik → Peloton → An → Aus → Hart aus |
-| Datenfeld **Frontlicht** | aktuelle Stufe und Akku | nächste angehakte Stufe, Pausenregel siehe oben |
+| Datenfeld **Frontlicht** | aktuelle Stufe und Akku | nächste angehakte Stufe im aktiven Licht, Pausenregel siehe oben |
+| Datenfeld **Abblend/Fern** | aktives oder vorgewähltes Licht | wechselt Abblend- und Fernlicht |
 
-Beide Aktionen gibt es auch als Zusatzaktion für eine Taste des Karoo
-(„Licht: Automatik / Peloton / An / Aus / Hart aus“, „Frontlicht: nächste Helligkeit“).
+Alle drei Aktionen gibt es auch als Zusatzaktion für eine Taste des Karoo
+(„Licht: Automatik / Peloton / An / Aus / Hart aus“, „Frontlicht: nächste Helligkeit“,
+„Frontlicht: Abblend / Fernlicht“).
 Außerhalb einer Fahrt reagieren die Felder nicht auf Tippen.
 
 ## Testen
@@ -156,9 +164,10 @@ adb pull /sdcard/Android/data/io.github.opaunke82.lightpilot/files/
 
 ## Offene Punkte
 
-- **Magicshine EVO 1700:** Fernlicht und das Auslesen des Lampenzustands (Statusmeldung `B1`:
-  an/aus, Stufe) folgen nach einem Bluetooth-Mitschnitt der Magicshine-App. Welche Stufe welchem
-  Lumenwert entspricht, ist ungeprüft.
+- **Magicshine EVO 1700:** Das Protokoll ist aus einem Mitschnitt der Magicshine-App ausgewertet
+  (`docs/magicshine-evo1700-protocol.md`). Die Lampe meldet weder Tastendrücke noch ihre aktuelle
+  Stufe; LightPilot zeigt deshalb die zuletzt gesendete Stufe. Bis v0.1.x hat LightPilot das
+  Fernlicht geschaltet, ab v0.2.0 werden alte Einstellungen auf Abblendlicht umgestellt.
 - **Rückmeldung des Varia:** Die App liest den gemeldeten Modus aus den LightParameters des Karoo.
   Ob der Karoo diese bei jeder Änderung schickt, ist ungeprüft. Im Protokoll: Zeilen „Reported mode“.
 - **Varia ohne Radar:** Die Verbindung der Varia wird über ihr Radar erkannt. Ist das Radar am
