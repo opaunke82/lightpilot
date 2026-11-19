@@ -9,7 +9,9 @@ import io.github.opaunke82.lightpilot.data.LightProtocol
 import io.github.opaunke82.lightpilot.light.LightController
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
@@ -20,6 +22,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import no.nordicsemi.kotlin.ble.client.android.CentralManager
 import no.nordicsemi.kotlin.ble.client.android.Peripheral
@@ -41,6 +44,9 @@ class MagicshineBleController(context: Context) : LightController {
         private const val WRITE_RETRY_DELAY_MS = 60L
         private const val RECONNECT_MIN_MS = 10_000L
         private const val RECONNECT_MAX_MS = 60_000L
+        /** After this many failed attempts in a row, look for the light with a short scan. */
+        private const val SCAN_AFTER_FAILURES = 2
+        private const val RECONNECT_SCAN_MS = 10_000L
     }
 
     private val appContext = context.applicationContext
@@ -63,6 +69,10 @@ class MagicshineBleController(context: Context) : LightController {
     val discoveredLights: StateFlow<List<DiscoveredLight>> = _discoveredLights
 
     var onDeviceConnected: (() -> Unit)? = null
+
+    private val _scanning = MutableStateFlow(false)
+    /** True while the discovery scan (settings page) runs. */
+    val scanning: StateFlow<Boolean> = _scanning
 
     private var scanCallback: android.bluetooth.le.ScanCallback? = null
     private val connectionJobs = java.util.concurrent.ConcurrentHashMap<String, Job>()
@@ -111,6 +121,7 @@ class MagicshineBleController(context: Context) : LightController {
                 .build()
             scanner.startScan(null, settings, callback)
             scanCallback = callback
+            _scanning.value = true
         } catch (e: Exception) {
             Timber.e(e, "$TAG: Failed to start BLE scan")
         }
@@ -145,6 +156,57 @@ class MagicshineBleController(context: Context) : LightController {
             }
         }
         scanCallback = null
+        _scanning.value = false
+    }
+
+    /**
+     * "Neu suchen": forget lights that were found but are neither set up nor connected,
+     * then scan again, so a light that was removed or reset shows up as new.
+     */
+    fun rescan() {
+        stopDiscovery()
+        val stale = devices.keys.filter { it !in assignedDeviceIds && !characteristics.containsKey(it) }
+        stale.forEach { devices.remove(it); deviceConfigs.remove(it) }
+        Timber.d("$TAG: Rescan, forgot ${stale.size} unassigned light(s)")
+        updateDiscoveredLights()
+        startDiscovery()
+    }
+
+    /**
+     * Short scan for one known light. Android connects by address reliably only to devices it
+     * has seen recently (after a restart it no longer knows the address type), so after failed
+     * attempts the light is looked for first. Returns true if it advertises.
+     */
+    private suspend fun scanFor(address: String): Boolean {
+        val scanner = bleScanner ?: return false
+        val found = CompletableDeferred<String?>()
+        val callback = object : android.bluetooth.le.ScanCallback() {
+            override fun onScanResult(callbackType: Int, result: android.bluetooth.le.ScanResult) {
+                if (result.device?.address == address) found.complete(result.scanRecord?.deviceName ?: "")
+            }
+
+            override fun onScanFailed(errorCode: Int) {
+                Timber.w("$TAG: Reconnect scan failed: $errorCode")
+                found.complete(null)
+            }
+        }
+        return try {
+            val filter = android.bluetooth.le.ScanFilter.Builder().setDeviceAddress(address).build()
+            val settings = android.bluetooth.le.ScanSettings.Builder()
+                .setScanMode(android.bluetooth.le.ScanSettings.SCAN_MODE_LOW_LATENCY)
+                .build()
+            scanner.startScan(listOf(filter), settings, callback)
+            val result = withTimeoutOrNull(RECONNECT_SCAN_MS) { found.await() }
+            val seen = result != null
+            if (!result.isNullOrEmpty() && !devices.containsKey(address)) registerFoundDevice(address, result)
+            Timber.d("$TAG: Reconnect scan for $address: ${if (seen) "found" else "not found (light off or connected elsewhere)"}")
+            seen
+        } catch (e: Exception) {
+            Timber.w(e, "$TAG: Reconnect scan error")
+            false
+        } finally {
+            try { scanner.stopScan(callback) } catch (_: Exception) { }
+        }
     }
 
     /**
@@ -155,10 +217,19 @@ class MagicshineBleController(context: Context) : LightController {
     private fun startConnectionSupervisor(address: String) {
         if (connectionJobs[address]?.isActive == true) return
         connectionJobs[address] = scope.launch {
+            Timber.d("$TAG: Keeping $address connected")
             var backoff = RECONNECT_MIN_MS
+            var failures = 0
             while (isActive && address in assignedDeviceIds) {
+                if (failures >= SCAN_AFTER_FAILURES && failures % SCAN_AFTER_FAILURES == 0) scanFor(address)
                 val wasConnected = attemptConnect(address)
-                backoff = if (wasConnected) RECONNECT_MIN_MS else minOf(backoff * 2, RECONNECT_MAX_MS)
+                if (wasConnected) {
+                    failures = 0
+                    backoff = RECONNECT_MIN_MS
+                } else {
+                    failures++
+                    backoff = minOf(backoff * 2, RECONNECT_MAX_MS)
+                }
                 delay(backoff)
             }
         }
@@ -240,6 +311,15 @@ class MagicshineBleController(context: Context) : LightController {
         } finally {
             characteristics.remove(address)
             updateDiscoveredLights()
+            // Never leave a half-open link behind (failed setup, light removed in the app):
+            // a light that stays connected to the Karoo is invisible to every scan.
+            withContext(NonCancellable) {
+                try {
+                    peripheral.disconnect()
+                } catch (e: Exception) {
+                    Timber.w(e, "$TAG: Disconnect of $address failed")
+                }
+            }
         }
     }
 

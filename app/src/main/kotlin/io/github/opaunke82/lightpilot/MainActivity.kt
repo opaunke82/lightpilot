@@ -74,6 +74,7 @@ class MainActivity : ComponentActivity() {
                 val settings by repository.settingsFlow.collectAsState(initial = AppSettings())
                 val ext by extension.collectAsState()
                 val lights = ext?.discoveredLights?.collectAsState()?.value ?: emptyList()
+                val bleScanning = ext?.magicshineController?.scanning?.collectAsState()?.value ?: false
                 val status = ext?.engine?.status?.collectAsState()?.value ?: EngineStatus()
                 val lux = ext?.ambientLightSensor?.currentLux?.collectAsState()?.value ?: 0f
                 val logLines by EventLog.lastLines.collectAsState()
@@ -82,6 +83,7 @@ class MainActivity : ComponentActivity() {
                 SettingsScreen(
                     settings = settings,
                     discoveredLights = lights,
+                    bleScanning = bleScanning,
                     status = status,
                     currentLux = lux,
                     sunrise = ext?.timeController?.getSunriseTime(),
@@ -104,6 +106,7 @@ class MainActivity : ComponentActivity() {
                             }
                             save(settings.withLight(null, light.id))
                         },
+                        rescanBle = { ext?.rescanBle() },
                         setSimulation = { ext?.engine?.setSimulation(it) },
                         setSimulatedRide = { ext?.engine?.setSimulatedRide(it) },
                         simulateVehicle = { ext?.engine?.simulateVehicle(5) },

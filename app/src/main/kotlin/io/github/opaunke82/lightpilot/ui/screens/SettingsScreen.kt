@@ -58,6 +58,7 @@ class SettingsActions(
     val save: (AppSettings) -> Unit,
     val testMode: (String, String) -> Unit,
     val forgetLight: (DiscoveredLight) -> Unit,
+    val rescanBle: () -> Unit,
     val setSimulation: (Boolean) -> Unit,
     val setSimulatedRide: (Boolean) -> Unit,
     val simulateVehicle: () -> Unit,
@@ -97,6 +98,7 @@ private fun phaseLabel(phase: RidePhase): String = when (phase) {
 fun SettingsScreen(
     settings: AppSettings,
     discoveredLights: List<DiscoveredLight>,
+    bleScanning: Boolean,
     status: EngineStatus,
     currentLux: Float,
     sunrise: Calendar?,
@@ -132,6 +134,18 @@ fun SettingsScreen(
 
         Section("Lichter") {
             LightList(settings, discoveredLights, status) { selectedLight = it }
+            Spacer(Modifier.height(8.dp))
+            OutlinedButton(onClick = actions.rescanBle, modifier = Modifier.fillMaxWidth()) {
+                Text("Nach Bluetooth-Lichtern suchen")
+            }
+            Note(
+                if (bleScanning) {
+                    "Bluetooth-Suche läuft, solange diese Seite offen ist. Die Magicshine muss eingeschaltet " +
+                        "und darf nicht mit einem Handy (Magicshine-App) verbunden sein."
+                } else {
+                    "Bluetooth-Suche aus."
+                },
+            )
         }
 
         selectedLight?.let { light ->
