@@ -10,6 +10,7 @@ import io.github.opaunke82.lightpilot.data.AppSettings
 import io.github.opaunke82.lightpilot.data.LightProtocol
 import io.github.opaunke82.lightpilot.data.LightSetup
 import io.github.opaunke82.lightpilot.data.PreferencesRepository
+import io.github.opaunke82.lightpilot.datatypes.BeamDataType
 import io.github.opaunke82.lightpilot.datatypes.FrontLightDataType
 import io.github.opaunke82.lightpilot.datatypes.StatusDataType
 import io.github.opaunke82.lightpilot.engine.AmbientLightSensor
@@ -174,7 +175,7 @@ class LightPilotExtension : KarooExtension(EXTENSION_ID, BuildConfig.VERSION_NAM
     private var bleStartJob: Job? = null
 
     override val types by lazy {
-        listOf(StatusDataType(this), FrontLightDataType(this))
+        listOf(StatusDataType(this), FrontLightDataType(this), BeamDataType(this))
     }
 
     override fun onCreate() {
@@ -628,6 +629,7 @@ class LightPilotExtension : KarooExtension(EXTENSION_ID, BuildConfig.VERSION_NAM
         when (actionId) {
             "manual-cycle" -> engine.manualCycle()
             "front-cycle" -> engine.frontCycle()
+            "beam-toggle" -> engine.beamToggle()
         }
     }
 

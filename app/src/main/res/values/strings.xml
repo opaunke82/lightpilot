@@ -4,7 +4,10 @@
     <string name="field_status">LightPilot</string>
     <string name="field_status_desc">Lichtmodus, Tag/Nacht und Radar. Tippen: Automatik, Peloton, An, Aus, Hart aus.</string>
     <string name="field_front">Frontlicht</string>
-    <string name="field_front_desc">Modus des Frontlichts. Tippen: nächste Helligkeit.</string>
+    <string name="field_front_desc">Modus des Frontlichts. Tippen: nächste Helligkeit im aktiven Licht.</string>
     <string name="action_manual_cycle">Licht: Automatik / Peloton / An / Aus / Hart aus</string>
     <string name="action_front_cycle">Frontlicht: nächste Helligkeit</string>
+    <string name="field_beam">Abblend/Fern</string>
+    <string name="field_beam_desc">Abblend- oder Fernlicht der Magicshine. Tippen: umschalten.</string>
+    <string name="action_beam_toggle">Frontlicht: Abblend / Fernlicht</string>
 </resources>

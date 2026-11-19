@@ -55,6 +55,30 @@ object MagicshineProtocol {
 
     val MODULE2_OFF = hexStringToBytes("DE14A20101010100000000000000000000BB0DED")
 
+    /**
+     * Two-group lamps (EVO 1700): one command carries both light groups, each as
+     * (on, mode, brightness %). Group 1 = low beam, group 2 = high beam. [slot] is the
+     * position in the Magicshine app's list (low beam 01, high beam 03), as the app sends it.
+     * See docs/magicshine-evo1700-protocol.md.
+     */
+    fun buildGroupCommand(slot: Int, low: Pair<Int, Int>?, high: Pair<Int, Int>?): ByteArray {
+        val content = ByteArray(14)
+        content[0] = slot.toByte()
+        low?.let { (mode, bright) ->
+            content[1] = 0x01; content[2] = mode.toByte(); content[3] = bright.coerceIn(0, 100).toByte()
+        }
+        high?.let { (mode, bright) ->
+            content[4] = 0x01; content[5] = mode.toByte(); content[6] = bright.coerceIn(0, 100).toByte()
+        }
+        content[13] = FLAG_SAVE
+        return buildFrame(0xA2.toByte(), 0x01, content)
+    }
+
+    /** Mode codes of the A2 command (02 = SOS, 03 = flash, seen in the app on 19.11.2026). */
+    const val M2_STEADY = 0x01
+    const val M2_SOS = 0x02
+    const val M2_FLASH = 0x03
+
     private fun buildFrame(type: Byte, status: Byte, content: ByteArray): ByteArray {
         val totalLen = 6 + content.size
         val frame = ByteArray(totalLen)
@@ -100,27 +124,27 @@ data class MagicshineDeviceConfig(
         return when (moduleType) {
             MagicshineModuleType.M1 -> {
                 val model = when (parts[0]) {
-                    "STEADY" -> MagicshineProtocol.MODE_STEADY
+                    "STEADY", "LOW", "HIGH" -> MagicshineProtocol.MODE_STEADY
                     "FLASH" -> MagicshineProtocol.MODE_FAST_FLASH
                     "SOS" -> MagicshineProtocol.MODE_SOS
                     else -> return null
                 }
                 MagicshineProtocol.buildBrightCommand(1, 1, model, bright)
             }
-            MagicshineModuleType.M2 -> {
-                val modeCode = when (parts[0]) {
-                    "STEADY" -> 0x01
-                    "FLASH" -> 0x03
-                    "SOS" -> 0x02
-                    else -> return null
-                }
-                MagicshineProtocol.buildModule2Frame(modeCode, bright)
+            MagicshineModuleType.M2 -> when (parts[0]) {
+                // Low beam is group 1, high beam group 2. "STEADY" (before v0.2.0) is low beam.
+                "LOW", "STEADY" -> MagicshineProtocol.buildGroupCommand(1, MagicshineProtocol.M2_STEADY to bright, null)
+                "HIGH" -> MagicshineProtocol.buildGroupCommand(3, null, MagicshineProtocol.M2_STEADY to bright)
+                "FLASH" -> MagicshineProtocol.buildGroupCommand(1, MagicshineProtocol.M2_FLASH to bright, null)
+                "SOS" -> MagicshineProtocol.buildGroupCommand(1, MagicshineProtocol.M2_SOS to bright, null)
+                else -> null
             }
         }
     }
 
     companion object {
         private val BRIGHTNESS_STEPS = listOf(10, 25, 50, 100)
+        val TEN_STEPS = (10..100 step 10).toList()
 
         fun forDevice(bleName: String): MagicshineDeviceConfig {
             // The digit after "M" is the device's lamp group count; only single-group
@@ -132,15 +156,18 @@ data class MagicshineDeviceConfig(
                 MagicshineModuleType.M2
             }
 
-            val modes = mutableListOf(LightModeOption("OFF", "Off"))
-            for (b in BRIGHTNESS_STEPS) {
-                modes.add(LightModeOption("STEADY_$b", "Steady $b%"))
+            val modes = mutableListOf(LightModeOption("OFF", "Aus"))
+            if (moduleType == MagicshineModuleType.M2) {
+                for (b in TEN_STEPS) modes.add(LightModeOption("LOW_$b", magicshineModeName("LOW_$b")))
+                for (b in TEN_STEPS) modes.add(LightModeOption("HIGH_$b", magicshineModeName("HIGH_$b")))
+            } else {
+                for (b in BRIGHTNESS_STEPS) modes.add(LightModeOption("STEADY_$b", magicshineModeName("STEADY_$b")))
             }
             for (b in BRIGHTNESS_STEPS) {
-                modes.add(LightModeOption("FLASH_$b", "Flash $b%"))
+                modes.add(LightModeOption("FLASH_$b", magicshineModeName("FLASH_$b")))
             }
             for (b in BRIGHTNESS_STEPS) {
-                modes.add(LightModeOption("SOS_$b", "SOS $b%"))
+                modes.add(LightModeOption("SOS_$b", magicshineModeName("SOS_$b")))
             }
 
             return MagicshineDeviceConfig(moduleType = moduleType, modes = modes)
@@ -150,4 +177,19 @@ data class MagicshineDeviceConfig(
 
 class MagicshineDeviceModeProvider(private val config: MagicshineDeviceConfig) : LightModeProvider {
     override fun availableModes(): List<LightModeOption> = config.modes
+}
+
+/** German name of a Magicshine mode, also for values set with the slider (e.g. LOW_35). */
+fun magicshineModeName(id: String): String {
+    if (id == "OFF") return "Aus"
+    val parts = id.split("_", limit = 2)
+    val pct = parts.getOrNull(1)?.toIntOrNull() ?: return id
+    return when (parts[0]) {
+        "LOW" -> "Abblend $pct %"
+        "HIGH" -> "Fernlicht $pct %"
+        "STEADY" -> "Dauerlicht $pct %"
+        "FLASH" -> "Blinken $pct %"
+        "SOS" -> "SOS $pct %"
+        else -> id
+    }
 }

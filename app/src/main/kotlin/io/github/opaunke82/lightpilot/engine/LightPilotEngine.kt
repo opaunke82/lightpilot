@@ -1,5 +1,7 @@
 package io.github.opaunke82.lightpilot.engine
 
+import io.github.opaunke82.lightpilot.core.Beam
+import io.github.opaunke82.lightpilot.data.hasBeams
 import io.github.opaunke82.lightpilot.core.Brain
 import io.github.opaunke82.lightpilot.core.BrainEvent
 import io.github.opaunke82.lightpilot.core.BrainState
@@ -42,6 +44,8 @@ data class LightStatus(
     val confirmed: Boolean,
     val observed: String?,
     val batteryPct: Int?,
+    /** Low or high beam (active or preselected), null for lights without beams. */
+    val beam: Beam? = null,
 )
 
 data class EngineStatus(
@@ -164,6 +168,13 @@ class LightPilotEngine(
         val front = settings.lights.firstOrNull { it.role == LightRole.FRONT && it.fieldModes.isNotEmpty() }
             ?: return@post
         apply(BrainEvent.FieldCycle(front.toCore(), now()))
+        evaluate()
+    }
+
+    /** Beam field tap: switch the first front light with beams between low and high beam. */
+    fun beamToggle() = post {
+        val front = settings.lights.firstOrNull { it.role == LightRole.FRONT && it.hasBeams() } ?: return@post
+        apply(BrainEvent.BeamToggle(front.toCore(), now()))
         evaluate()
     }
 
@@ -316,6 +327,7 @@ class LightPilotEngine(
                 confirmed = step.confirmed,
                 observed = observed,
                 batteryPct = brain.batteryPct[setup.deviceId],
+                beam = Brain.activeBeam(brain, config, core, t),
             )
         }
         publishStatus(result)

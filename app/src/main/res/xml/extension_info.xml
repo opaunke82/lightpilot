@@ -18,6 +18,13 @@
         graphical="true"
         icon="@drawable/ic_light" />
 
+    <DataType
+        typeId="beam"
+        displayName="@string/field_beam"
+        description="@string/field_beam_desc"
+        graphical="true"
+        icon="@drawable/ic_light" />
+
     <BonusAction
         actionId="manual-cycle"
         displayName="@string/action_manual_cycle" />
@@ -25,4 +32,8 @@
     <BonusAction
         actionId="front-cycle"
         displayName="@string/action_front_cycle" />
+
+    <BonusAction
+        actionId="beam-toggle"
+        displayName="@string/action_beam_toggle" />
 </ExtensionInfo>
