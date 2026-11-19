@@ -34,12 +34,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.opaunke82.lightpilot.BuildConfig
 import io.github.opaunke82.lightpilot.DiscoveredLight
+import io.github.opaunke82.lightpilot.batteryColor
 import io.github.opaunke82.lightpilot.batteryText
 import io.github.opaunke82.lightpilot.connectionLabel
 import io.github.opaunke82.lightpilot.core.ManualMode
@@ -147,6 +152,16 @@ fun SettingsScreen(
                     "Bluetooth-Suche aus."
                 },
             )
+            Spacer(Modifier.height(8.dp))
+            IntSlider(
+                label = "Frontlicht-Feld: Weitertippen innerhalb",
+                value = settings.frontCycleWindowSeconds, range = 0..10, unit = "s",
+            ) { actions.save(settings.copy(frontCycleWindowSeconds = it)) }
+            Note(
+                "Tippen innerhalb dieser Zeit schaltet zur nächsten Stufe. Der erste Tipp nach einer längeren " +
+                    "Pause schaltet das Frontlicht aus (wenn „Aus“ im Zyklus ist), ein Tipp bei ausgeschaltetem " +
+                    "Licht schaltet es wieder ein. 0 s = immer nächste Stufe.",
+            )
         }
 
         selectedLight?.let { light ->
@@ -252,6 +267,16 @@ private fun Section(title: String, content: @Composable () -> Unit) {
 }
 
 @Composable
+internal fun withBatteryColor(text: String, protocol: LightProtocol, pct: Int?): AnnotatedString =
+    buildAnnotatedString {
+        append(text)
+        val battery = batteryText(protocol, pct) ?: return@buildAnnotatedString
+        if (text.isNotEmpty()) append(" · ")
+        val color = batteryColor(protocol, pct)
+        if (color != null) withStyle(SpanStyle(color = Color(color))) { append(battery) } else append(battery)
+    }
+
+@Composable
 private fun Note(text: String) {
     Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
@@ -333,12 +358,11 @@ private fun LightList(
             null -> "antippen zum Einrichten"
         }
         val protocol = if (light.protocol == LightProtocol.BLE) "Bluetooth" else "ANT+"
-        val info = listOfNotNull(
-            protocol,
-            light.manufacturer,
-            light.connectionLabel(),
-            batteryText(light.protocol, light.batteryPercent),
-        ).joinToString(" · ")
+        val info = withBatteryColor(
+            listOfNotNull(protocol, light.manufacturer, light.connectionLabel()).joinToString(" · "),
+            light.protocol,
+            light.batteryPercent,
+        )
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -350,7 +374,7 @@ private fun LightList(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(light.name)
-                Note(info)
+                Text(info, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Text(role, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
         }

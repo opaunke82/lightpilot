@@ -106,6 +106,8 @@ data class AppSettings(
     val zoneNotifications: Boolean = true,
     /** Offer the peloton mode on the data field. */
     val pelotonEnabled: Boolean = true,
+    /** Front field: taps within this time step on, after a longer break the first tap is "off". 0 = off. */
+    val frontCycleWindowSeconds: Int = 5,
 ) {
     fun toCore() = Settings(
         radarMinThreatLevel = radarMinThreatLevel.coerceIn(1, 3),
@@ -116,6 +118,7 @@ data class AppSettings(
         batterySaverThresholdPct = batterySaverThresholdPct.coerceIn(5, 50),
         offAfterRide = offAfterRide,
         pelotonEnabled = pelotonEnabled,
+        fieldCycleWindowMs = frontCycleWindowSeconds.coerceIn(0, 10) * 1_000L,
     )
 
     fun withLight(setup: LightSetup?, deviceId: String): AppSettings =

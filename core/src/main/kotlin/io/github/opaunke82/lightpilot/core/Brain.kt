@@ -15,6 +15,8 @@ data class BrainState(
     val pins: Map<String, Pin> = emptyMap(),
     val radar: RadarState = RadarState(),
     val batteryPct: Map<String, Int> = emptyMap(),
+    /** Time of the last data field tap per light (cycle window). */
+    val fieldTapMs: Map<String, Long> = emptyMap(),
 )
 
 data class RadarState(
@@ -47,8 +49,11 @@ sealed interface BrainEvent {
     /** Someone changed the light outside the app. */
     data class ExternalChange(val lightId: String, val mode: String) : BrainEvent
 
-    /** Per-light data field tap: next mode of [LightConfig.fieldModes]. */
-    data class FieldCycle(val light: LightConfig) : BrainEvent
+    /**
+     * Per-light data field tap: next mode of [LightConfig.fieldModes]. With a cycle window,
+     * a tap after a longer break switches the light off first (if "off" is in the cycle).
+     */
+    data class FieldCycle(val light: LightConfig, val nowMs: Long = 0) : BrainEvent
     data class Battery(val lightId: String, val pct: Int?) : BrainEvent
 }
 
@@ -111,14 +116,27 @@ object Brain {
             state.copy(pins = state.pins + (event.lightId to Pin(event.mode, PinSource.EXTERNAL)))
 
         is BrainEvent.FieldCycle -> {
-            val modes = event.light.fieldModes
+            val light = event.light
+            val modes = light.fieldModes
             if (modes.isEmpty()) {
                 state
             } else {
-                val current = state.pins[event.light.id]?.mode
-                val index = modes.indexOf(current)
-                val next = modes[(index + 1) % modes.size]
-                state.copy(pins = state.pins + (event.light.id to Pin(next, PinSource.FIELD)))
+                val last = state.fieldTapMs[light.id]
+                val window = settings.fieldCycleWindowMs
+                val breakOver = window > 0 && (last == null || event.nowMs - last > window)
+                val shownNow = decide(state, light, settings, event.nowMs).mode
+                val lightIsOn = shownNow != null && shownNow != MODE_OFF
+                val next = if (breakOver && lightIsOn && MODE_OFF in modes) {
+                    // First tap after a break: off. Further taps within the window go up again.
+                    MODE_OFF
+                } else {
+                    val index = modes.indexOf(state.pins[light.id]?.mode)
+                    modes[(index + 1) % modes.size]
+                }
+                state.copy(
+                    pins = state.pins + (light.id to Pin(next, PinSource.FIELD)),
+                    fieldTapMs = state.fieldTapMs + (light.id to event.nowMs),
+                )
             }
         }
 
