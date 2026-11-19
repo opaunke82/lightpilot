@@ -165,14 +165,15 @@ fun LightDetailDialog(
                     if (setup.role == LightRole.FRONT) {
                         HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                         Text("Stufen für das Frontlicht-Datenfeld", style = MaterialTheme.typography.labelMedium)
-                        modes.filter { it.id != "OFF" }.forEach { option ->
+                        // Order of the cycle: the light's modes from low to high, "Aus" last.
+                        val cycleOrder = modes.filter { it.id != "OFF" } + LightModeOption("OFF", "Aus")
+                        cycleOrder.forEach { option ->
                             val checked = option.id in setup.fieldModes
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Checkbox(
                                     checked = checked,
                                     onCheckedChange = { on ->
-                                        // Keep the order of the mode list.
-                                        val selected = modes.map { it.id }
+                                        val selected = cycleOrder.map { it.id }
                                             .filter { id -> if (id == option.id) on else id in setup.fieldModes }
                                         onUpdate(setup.copy(fieldModes = selected))
                                     },
