@@ -83,8 +83,9 @@ data class Settings(
     /** Peloton mode is offered on the data field. Off: it is skipped and acts like automatic. */
     val pelotonEnabled: Boolean = true,
     /**
-     * Front field: taps within this time step through the cycle; the first tap after a longer
-     * break switches the light off (if "off" is in the cycle). 0 = always the next step.
+     * Front field: taps within this time step through the cycle. The first tap after a longer
+     * break switches a light that is on off, and a light that is off on at the lowest ticked
+     * step. 0 = no break rule, every tap is the next step.
      */
     val fieldCycleWindowMs: Long = 5_000,
 )

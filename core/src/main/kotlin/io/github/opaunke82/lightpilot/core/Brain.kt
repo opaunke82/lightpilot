@@ -126,17 +126,26 @@ object Brain {
                 val breakOver = window > 0 && (last == null || event.nowMs - last > window)
                 val shownNow = decide(state, light, settings, event.nowMs).mode
                 val lightIsOn = shownNow != null && shownNow != MODE_OFF
-                val next = if (breakOver && lightIsOn && MODE_OFF in modes) {
-                    // First tap after a break: off. Further taps within the window go up again.
-                    MODE_OFF
-                } else {
-                    val index = modes.indexOf(state.pins[light.id]?.mode)
-                    modes[(index + 1) % modes.size]
+                val lowest = modes.firstOrNull { it != MODE_OFF }
+                val pinned = state.pins[light.id]?.mode
+                val next = when {
+                    // First tap after a break: a light that is on goes off (whether or not
+                    // "Aus" is ticked), a light that is off goes to the lowest ticked step.
+                    breakOver && lightIsOn -> MODE_OFF
+                    breakOver -> lowest
+                    // Within the window after such an "off": start again as if it had been off.
+                    pinned == MODE_OFF && MODE_OFF !in modes -> lowest
+                    // Within the window: next step of the cycle.
+                    else -> modes[(modes.indexOf(pinned) + 1) % modes.size]
                 }
-                state.copy(
-                    pins = state.pins + (light.id to Pin(next, PinSource.FIELD)),
-                    fieldTapMs = state.fieldTapMs + (light.id to event.nowMs),
-                )
+                if (next == null) {
+                    state
+                } else {
+                    state.copy(
+                        pins = state.pins + (light.id to Pin(next, PinSource.FIELD)),
+                        fieldTapMs = state.fieldTapMs + (light.id to event.nowMs),
+                    )
+                }
             }
         }
 

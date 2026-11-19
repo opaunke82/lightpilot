@@ -164,6 +164,12 @@ fun LightDetailDialog(
                     if (setup.role == LightRole.FRONT) {
                         HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                         Text("Stufen für das Frontlicht-Datenfeld", style = MaterialTheme.typography.labelMedium)
+                        Text(
+                            "„Aus“ angehakt: Aus kommt auch beim schnellen Durchtippen. Nach einer Pause schaltet " +
+                                "der erste Tipp ohnehin aus (Zeit unter „Lichter“ einstellbar).",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                         // Order of the cycle: the light's modes from low to high, "Aus" last.
                         val cycleOrder = modes.filter { it.id != "OFF" } + LightModeOption("OFF", "Aus")
                         cycleOrder.forEach { option ->

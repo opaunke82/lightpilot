@@ -158,9 +158,9 @@ fun SettingsScreen(
                 value = settings.frontCycleWindowSeconds, range = 0..10, unit = "s",
             ) { actions.save(settings.copy(frontCycleWindowSeconds = it)) }
             Note(
-                "Tippen innerhalb dieser Zeit schaltet zur nächsten Stufe. Der erste Tipp nach einer längeren " +
-                    "Pause schaltet das Frontlicht aus (wenn „Aus“ im Zyklus ist), ein Tipp bei ausgeschaltetem " +
-                    "Licht schaltet es wieder ein. 0 s = immer nächste Stufe.",
+                "Tippen innerhalb dieser Zeit schaltet zur nächsten angehakten Stufe. Der erste Tipp nach einer " +
+                    "längeren Pause schaltet das Frontlicht aus; ist es schon aus, geht es auf die kleinste " +
+                    "angehakte Stufe. Nach dem Aus beginnt der Zyklus wieder von unten. 0 s = keine Pausenregel.",
             )
         }
 
