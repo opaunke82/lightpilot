@@ -211,13 +211,36 @@ class BrainTest {
             return mode(s, front, at)
         }
         // Night mode 50 % is on: the first tap after a break switches off,
-        // further taps within 5 s step up through the cycle.
+        // further taps within 5 s start again from the lowest step.
         val seen = listOf(1_000L, 2_000, 3_000, 4_000, 5_000, 6_000).map { tap(it) }
         assertEquals(listOf<String?>(MODE_OFF, "STEADY_25", "STEADY_50", "STEADY_100", MODE_OFF, "STEADY_25"), seen)
-        // Break of more than 5 s while on: off.
+        // At 50 %, break of more than 5 s: off, then 25 % (as if it had been off before).
+        tap(7_000)
         assertEquals(MODE_OFF, tap(20_000))
-        // Break while off: the tap switches on again.
+        assertEquals("STEADY_25", tap(21_000))
+        // Off, break: on at the lowest step.
+        tap(22_000)
+        tap(23_000)
+        assertEquals(MODE_OFF, tap(24_000))
         assertEquals("STEADY_25", tap(40_000))
+    }
+
+    @Test
+    fun frontFieldBreakSwitchesOffEvenIfOffIsNotTicked() {
+        var s = run(BrainEvent.RideChanged(RidePhase.RECORDING, 0), BrainEvent.ZoneChanged(Zone.NIGHT))
+        fun tap(at: Long): String? {
+            s = run(BrainEvent.FieldCycle(evo, at), from = s)
+            return mode(s, evo, at)
+        }
+        val seen = listOf(1_000L, 2_000, 3_000, 4_000, 5_000).map { tap(it) }
+        // Cycle without "Aus": 25 -> 50 -> 100 -> 25; off only after a break.
+        assertEquals(listOf<String?>(MODE_OFF, "STEADY_25", "STEADY_50", "STEADY_100", "STEADY_25"), seen)
+        assertEquals(MODE_OFF, tap(20_000))
+        assertEquals("STEADY_25", tap(21_000))
+        // By day the front is off (day mode): a tap after a break switches it on.
+        s = run(BrainEvent.ZoneChanged(Zone.DAY), from = s)
+        assertEquals(MODE_OFF, mode(s, evo, 50_000))
+        assertEquals("STEADY_25", tap(50_000))
     }
 
     @Test
@@ -325,12 +348,15 @@ class BrainTest {
 
     @Test
     fun frontFieldCyclesBrightness() {
-        var s = run(BrainEvent.RideChanged(RidePhase.RECORDING, 0), BrainEvent.ZoneChanged(Zone.NIGHT))
-        s = run(BrainEvent.FieldCycle(evo), from = s)
-        assertEquals("STEADY_25", mode(s, evo, 0))
-        s = run(BrainEvent.FieldCycle(evo), BrainEvent.FieldCycle(evo), BrainEvent.FieldCycle(evo), from = s)
-        assertEquals("STEADY_25", mode(s, evo, 0))
+        // Without the break rule (window 0) every tap is the next step.
+        val plain = settings.copy(fieldCycleWindowMs = 0)
+        fun go(from: BrainState, vararg e: BrainEvent) = e.fold(from) { acc, ev -> Brain.reduce(acc, ev, plain) }
+        var s = go(BrainState(), BrainEvent.RideChanged(RidePhase.RECORDING, 0), BrainEvent.ZoneChanged(Zone.NIGHT))
+        s = go(s, BrainEvent.FieldCycle(evo))
+        assertEquals("STEADY_25", Brain.decide(s, evo, plain, 0).mode)
+        s = go(s, BrainEvent.FieldCycle(evo), BrainEvent.FieldCycle(evo), BrainEvent.FieldCycle(evo))
+        assertEquals("STEADY_25", Brain.decide(s, evo, plain, 0).mode)
         // The rear light is not affected.
-        assertEquals("SLOW_FLASH", mode(s, varia, 0))
+        assertEquals("SLOW_FLASH", Brain.decide(s, varia, plain, 0).mode)
     }
 }
