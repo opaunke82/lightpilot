@@ -77,6 +77,8 @@ class SettingsActions(
     val beamToggle: () -> Unit,
     val exportLog: () -> Unit,
     val factoryReset: () -> Unit,
+    val brakeRecording: (Boolean) -> Unit,
+    val latencyTest: () -> Unit,
 )
 
 fun reasonLabel(reason: Reason): String = when (reason) {
@@ -107,6 +109,7 @@ fun SettingsScreen(
     settings: AppSettings,
     discoveredLights: List<DiscoveredLight>,
     bleScanning: Boolean,
+    brakeDiag: String,
     status: EngineStatus,
     currentLux: Float,
     sunrise: Calendar?,
@@ -239,6 +242,23 @@ fun SettingsScreen(
             }
             if (showLog) LogViewer(onClose = { showLog = false })
             exportInfo?.let { Note("Gespeichert: $it") }
+
+            Spacer(Modifier.height(12.dp))
+            Text("Bremslicht-Messung", style = MaterialTheme.typography.labelMedium)
+            Note(
+                "Zeichnet Beschleunigungssensor, Geschwindigkeit und Lichtbefehle in eine CSV-Datei auf " +
+                    "(Ordner wie das Protokoll). Läuft auch bei geschlossener Seite weiter, höchstens 3 h.",
+            )
+            val recording = brakeDiag.startsWith("läuft")
+            SwitchRow("Aufzeichnen", recording) { actions.brakeRecording(it) }
+            Note(brakeDiag)
+            OutlinedButton(onClick = actions.latencyTest, modifier = Modifier.fillMaxWidth()) {
+                Text("Latenztest Rücklicht (1 min)")
+            }
+            Note(
+                "Ohne Fahrt: 10× Dauerlicht hell und Aus im Abstand von 3 s, mit Piepton beim Senden " +
+                    "(hoch = an, tief = aus). Mit dem Handy Licht und Karoo mit Ton filmen.",
+            )
         }
 
         Section("Zurücksetzen") {
