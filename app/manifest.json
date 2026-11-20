@@ -3,9 +3,9 @@
   "packageName": "io.github.opaunke82.lightpilot",
   "iconUrl": "https://raw.githubusercontent.com/opaunke82/lightpilot/main/docs/icon.svg",
   "latestApkUrl": "https://github.com/opaunke82/lightpilot/releases/latest/download/lightpilot.apk",
-  "latestVersion": "0.2.0",
-  "latestVersionCode": 13,
+  "latestVersion": "0.2.1",
+  "latestVersionCode": 14,
   "developer": "opaunke82",
   "description": "Lichtsteuerung für Garmin Varia (ANT+) und Magicshine EVO 1700 (Bluetooth): nachts blinken, tagsüber nur bei Annäherung, Sparmodus, Pause-Regeln.",
-  "releaseNotes": "Magicshine: Abblend- und Fernlicht getrennt, neues Datenfeld Abblend/Fern, eigene Stufen pro Licht, freier Wert per Schieberegler."
+  "releaseNotes": "Messbuild Bremslicht: Aufzeichnung von Beschleunigungssensor, Geschwindigkeit und Lichtbefehlen, Latenztest Rücklicht."
 }

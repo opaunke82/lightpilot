@@ -3,6 +3,8 @@
 
 package io.github.opaunke82.lightpilot
 
+import io.github.opaunke82.lightpilot.core.MODE_OFF
+import io.github.opaunke82.lightpilot.diag.BrakeRecorder
 import io.github.opaunke82.lightpilot.ble.MagicshineBleController
 import io.github.opaunke82.lightpilot.core.RidePhase
 import io.github.opaunke82.lightpilot.core.Zone
@@ -131,6 +133,7 @@ class LightPilotExtension : KarooExtension(EXTENSION_ID, BuildConfig.VERSION_NAM
         const val EXTENSION_ID = "lightpilot"
         private const val BIKE_LIGHT_DATA_TYPE = "TYPE_BIKE_LIGHT_ID"
         private const val DEVICE_TYPE_BIKE_LIGHT = 35
+        private const val MAX_BRAKE_RECORDING_S = 3 * 3600L
         /** Same as the radar watchdog: after this long without radar data the Varia counts as off. */
         private const val RADAR_ALIVE_MS = 5_000L
 
@@ -556,6 +559,85 @@ class LightPilotExtension : KarooExtension(EXTENSION_ID, BuildConfig.VERSION_NAM
         }
     }
 
+    // ---- Brake light measurement ------------------------------------------------------
+
+    private var speedConsumerId: String? = null
+    private var latencyJob: Job? = null
+    private val _brakeDiag = MutableStateFlow("aus")
+    /** Status line of the brake measurement for the settings page. */
+    val brakeDiag: StateFlow<String> = _brakeDiag
+    private var brakeStatusJob: Job? = null
+
+    fun startBrakeRecording() {
+        val r = BrakeRecorder.start(this)
+        if (speedConsumerId == null) {
+            speedConsumerId = karooSystem.addConsumer(OnStreamState.StartStreaming(DataType.Type.SPEED)) { event: OnStreamState ->
+                val state = event.state
+                if (state is StreamState.Streaming) {
+                    BrakeRecorder.active?.mark("S", state.dataPoint.values[DataType.Field.SPEED])
+                }
+            }
+        }
+        brakeStatusJob?.cancel()
+        brakeStatusJob = extensionScope.launch {
+            while (true) {
+                val sec = (android.os.SystemClock.elapsedRealtime() - r.startedAtMs) / 1000
+                _brakeDiag.value = if (r.hasAccelerometer) {
+                    "läuft ${sec / 60}:${"%02d".format(sec % 60)} · ${r.samples} Messwerte · ${r.file.name}"
+                } else {
+                    "läuft, aber kein Beschleunigungssensor für Apps verfügbar · ${r.file.name}"
+                }
+                if (sec > MAX_BRAKE_RECORDING_S) {
+                    stopBrakeRecording()
+                    break
+                }
+                delay(1_000)
+            }
+        }
+    }
+
+    fun stopBrakeRecording() {
+        latencyJob?.cancel()
+        speedConsumerId?.let { karooSystem.removeConsumer(it) }
+        speedConsumerId = null
+        brakeStatusJob?.cancel()
+        val file = BrakeRecorder.stop()
+        _brakeDiag.value = file?.let { "gespeichert: ${it.name}" } ?: "aus"
+    }
+
+    /**
+     * Rear light latency: 10 × "Dauerlicht hell" and back to "Aus", 3 s apart, each with a
+     * beep at the moment the command is queued (high tone = on, low tone = off). Film light
+     * and Karoo with sound: the time from beep to light change is the latency. Only
+     * outside a ride, so the automatic control does not interfere.
+     */
+    fun runLatencyTest(): String? {
+        if (isRideActive || engine.status.value.simulation) return "Nur ohne Fahrt und ohne Simulation."
+        val rear = settings.lights.firstOrNull { it.protocol == LightProtocol.ANT_PLUS }
+            ?: return "Kein ANT+-Rücklicht eingerichtet."
+        if (latencyJob?.isActive == true) return null
+        val ownRecording = BrakeRecorder.active == null
+        if (ownRecording) startBrakeRecording()
+        latencyJob = extensionScope.launch {
+            try {
+                delay(2_000)
+                repeat(10) { i ->
+                    BrakeRecorder.active?.mark("B", "on-${i + 1}")
+                    karooSystem.dispatch(PlayBeepPattern(listOf(PlayBeepPattern.Tone(frequency = 1760, durationMs = 80))))
+                    lightControl.setMode(rear.deviceId, "STEADY4")
+                    delay(3_000)
+                    BrakeRecorder.active?.mark("B", "off-${i + 1}")
+                    karooSystem.dispatch(PlayBeepPattern(listOf(PlayBeepPattern.Tone(frequency = 880, durationMs = 80))))
+                    lightControl.setMode(rear.deviceId, MODE_OFF)
+                    delay(3_000)
+                }
+            } finally {
+                if (ownRecording) stopBrakeRecording()
+            }
+        }
+        return null
+    }
+
     // ---- Radar ------------------------------------------------------------------------
 
     private fun startRadar() {
@@ -636,6 +718,7 @@ class LightPilotExtension : KarooExtension(EXTENSION_ID, BuildConfig.VERSION_NAM
     override fun onDestroy() {
         Timber.d("$TAG: extension onDestroy")
         instance = null
+        stopBrakeRecording()
         stopRadar()
         stopDiscoveryPolling()
         engine.destroy()

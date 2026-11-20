@@ -4,6 +4,7 @@
 
 package io.github.opaunke82.lightpilot.karoo
 
+import io.github.opaunke82.lightpilot.diag.BrakeRecorder
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -72,6 +73,7 @@ class KarooLightControl(private val context: Context) : LightController {
             for (cmd in commandChannel) {
                 try {
                     executeSetLightMode(cmd.deviceId, cmd.modeName)
+                    BrakeRecorder.active?.mark("C", cmd.deviceId, cmd.modeName)
                     delay(250L)
                 } catch (e: Exception) {
                     Timber.e(e, "$TAG: Error executing queued light command")
@@ -232,6 +234,7 @@ class KarooLightControl(private val context: Context) : LightController {
     }
 
     override fun setMode(deviceId: String, modeName: String) {
+        BrakeRecorder.active?.mark("Q", deviceId, modeName)
         commandChannel.trySend(QueuedCommand(deviceId, modeName))
     }
 
@@ -327,6 +330,7 @@ class KarooLightControl(private val context: Context) : LightController {
                 // command are filtered by the reconciler's grace time, not here.
                 if (modeName != null && modeName != "UNKNOWN" && _currentModes.value[deviceId] != modeName) {
                     Timber.d("$TAG: Reported mode $deviceId: $modeName")
+                    BrakeRecorder.active?.mark("R", deviceId, modeName)
                     _currentModes.update { it + (deviceId to modeName) }
                 }
             } finally {

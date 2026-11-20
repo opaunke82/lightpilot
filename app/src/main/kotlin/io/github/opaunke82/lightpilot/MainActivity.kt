@@ -75,6 +75,7 @@ class MainActivity : ComponentActivity() {
                 val ext by extension.collectAsState()
                 val lights = ext?.discoveredLights?.collectAsState()?.value ?: emptyList()
                 val bleScanning = ext?.magicshineController?.scanning?.collectAsState()?.value ?: false
+                val brakeDiag = ext?.brakeDiag?.collectAsState()?.value ?: "aus"
                 val status = ext?.engine?.status?.collectAsState()?.value ?: EngineStatus()
                 val lux = ext?.ambientLightSensor?.currentLux?.collectAsState()?.value ?: 0f
                 val exportInfo = remember { mutableStateOf<String?>(null) }
@@ -83,6 +84,7 @@ class MainActivity : ComponentActivity() {
                     settings = settings,
                     discoveredLights = lights,
                     bleScanning = bleScanning,
+                    brakeDiag = brakeDiag,
                     status = status,
                     currentLux = lux,
                     sunrise = ext?.timeController?.getSunriseTime(),
@@ -115,6 +117,12 @@ class MainActivity : ComponentActivity() {
                         simulateZone = { ext?.engine?.simulateZone(it) },
                         frontCycle = { ext?.engine?.frontCycle() },
                         beamToggle = { ext?.engine?.beamToggle() },
+                        brakeRecording = { on -> if (on) ext?.startBrakeRecording() else ext?.stopBrakeRecording() },
+                        latencyTest = {
+                            ext?.runLatencyTest()?.let { msg ->
+                                Toast.makeText(this@MainActivity, msg, Toast.LENGTH_LONG).show()
+                            }
+                        },
                         factoryReset = {
                             ext?.factoryReset()
                             EventLog.clear()
