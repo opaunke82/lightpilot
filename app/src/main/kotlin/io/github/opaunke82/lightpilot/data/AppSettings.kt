@@ -120,6 +120,10 @@ data class AppSettings(
     val pelotonEnabled: Boolean = true,
     /** Front field: taps within this time step on, after a longer break the first tap is "off". 0 = off. */
     val frontCycleWindowSeconds: Int = 5,
+    /** Shimano Di2 hood buttons through Ki2. Off by default. */
+    val di2Enabled: Boolean = false,
+    /** "<channel>:<SINGLE|DOUBLE|HOLD>" -> Di2Action name. Missing = no action. */
+    val di2Actions: Map<String, String> = emptyMap(),
 ) {
     fun toCore() = Settings(
         radarMinThreatLevel = radarMinThreatLevel.coerceIn(1, 3),

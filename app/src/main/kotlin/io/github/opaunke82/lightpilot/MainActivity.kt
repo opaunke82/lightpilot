@@ -19,6 +19,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import io.github.opaunke82.lightpilot.data.AppSettings
 import io.github.opaunke82.lightpilot.data.PreferencesRepository
+import io.github.opaunke82.lightpilot.di2.Ki2Bridge
 import io.github.opaunke82.lightpilot.engine.EngineStatus
 import io.github.opaunke82.lightpilot.engine.TimeBasedController
 import io.github.opaunke82.lightpilot.log.EventLog
@@ -76,6 +77,8 @@ class MainActivity : ComponentActivity() {
                 val lights = ext?.discoveredLights?.collectAsState()?.value ?: emptyList()
                 val bleScanning = ext?.magicshineController?.scanning?.collectAsState()?.value ?: false
                 val brakeDiag = ext?.brakeDiag?.collectAsState()?.value ?: "aus"
+                val ki2State = ext?.ki2Bridge?.state?.collectAsState()?.value ?: Ki2Bridge.State.OFF
+                val di2LastButton = ext?.ki2Bridge?.lastButton?.collectAsState()?.value
                 val status = ext?.engine?.status?.collectAsState()?.value ?: EngineStatus()
                 val lux = ext?.ambientLightSensor?.currentLux?.collectAsState()?.value ?: 0f
                 val exportInfo = remember { mutableStateOf<String?>(null) }
@@ -85,6 +88,8 @@ class MainActivity : ComponentActivity() {
                     discoveredLights = lights,
                     bleScanning = bleScanning,
                     brakeDiag = brakeDiag,
+                    ki2State = ki2State,
+                    di2LastButton = di2LastButton,
                     status = status,
                     currentLux = lux,
                     sunrise = ext?.timeController?.getSunriseTime(),

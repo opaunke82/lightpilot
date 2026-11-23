@@ -52,6 +52,7 @@ import io.github.opaunke82.lightpilot.core.Reason
 import io.github.opaunke82.lightpilot.core.Zone
 import io.github.opaunke82.lightpilot.core.RidePhase
 import io.github.opaunke82.lightpilot.data.AppSettings
+import io.github.opaunke82.lightpilot.di2.Ki2Bridge
 import io.github.opaunke82.lightpilot.data.LightProtocol
 import io.github.opaunke82.lightpilot.data.LightRole
 import io.github.opaunke82.lightpilot.data.modeDisplayName
@@ -110,6 +111,8 @@ fun SettingsScreen(
     discoveredLights: List<DiscoveredLight>,
     bleScanning: Boolean,
     brakeDiag: String,
+    ki2State: Ki2Bridge.State,
+    di2LastButton: String?,
     status: EngineStatus,
     currentLux: Float,
     sunrise: Calendar?,
@@ -229,6 +232,18 @@ fun SettingsScreen(
                     value = settings.batterySaverThresholdPct, range = 5..50, unit = "%",
                 ) { actions.save(settings.copy(batterySaverThresholdPct = it)) }
                 Note("Das Varia meldet den Akku nur grob (gut / ok / niedrig / kritisch); „niedrig“ zählt als 20 %.")
+            }
+        }
+
+        Section("Di2-Tasten (Ki2)") {
+            var showDi2 by remember { mutableStateOf(false) }
+            Note(
+                if (settings.di2Enabled) "an · ${ki2StateLabel(ki2State)}"
+                else "aus · Shimano-Di2-Tasten über die Extension Ki2 für das Licht nutzen",
+            )
+            OutlinedButton(onClick = { showDi2 = true }, modifier = Modifier.fillMaxWidth()) { Text("Öffnen") }
+            if (showDi2) {
+                Di2Screen(settings, ki2State, di2LastButton, actions.save) { showDi2 = false }
             }
         }
 

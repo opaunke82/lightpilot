@@ -35,3 +35,10 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
+
+## Ki2
+
+LightPilot talks to the exported service of Ki2 (https://github.com/valterc/ki2) to receive
+Shimano Di2 hood button events. No source code of Ki2 is included; the service and callback
+descriptors, transaction order and parcel layout follow Ki2's public interface.
+Ki2 is licensed under the MIT License, Copyright (c) 2022 Valter C.

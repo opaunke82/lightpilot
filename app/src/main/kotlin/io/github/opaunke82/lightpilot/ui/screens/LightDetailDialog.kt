@@ -316,7 +316,7 @@ private fun ModeRow(
 }
 
 @Composable
-private fun InlineDropdown(
+internal fun InlineDropdown(
     label: String,
     selectedId: String,
     options: List<Pair<String, String>>,

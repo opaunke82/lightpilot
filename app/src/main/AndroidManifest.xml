@@ -13,6 +13,11 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
 
+    <!-- Ki2 (Shimano Di2 extension): bind to its service for the hood buttons. -->
+    <queries>
+        <package android:name="com.valterc.ki2" />
+    </queries>
+
     <application
         android:name=".App"
         android:allowBackup="true"

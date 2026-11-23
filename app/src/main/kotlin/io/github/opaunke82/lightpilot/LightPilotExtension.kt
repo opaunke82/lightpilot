@@ -4,6 +4,10 @@
 package io.github.opaunke82.lightpilot
 
 import io.github.opaunke82.lightpilot.core.MODE_OFF
+import io.github.opaunke82.lightpilot.di2.Di2Action
+import io.github.opaunke82.lightpilot.di2.Di2Press
+import io.github.opaunke82.lightpilot.di2.Ki2Bridge
+import io.github.opaunke82.lightpilot.di2.di2Key
 import io.github.opaunke82.lightpilot.diag.BrakeRecorder
 import io.github.opaunke82.lightpilot.ble.MagicshineBleController
 import io.github.opaunke82.lightpilot.core.RidePhase
@@ -200,6 +204,7 @@ class LightPilotExtension : KarooExtension(EXTENSION_ID, BuildConfig.VERSION_NAM
             if (zone == Zone.NIGHT) magicshineController.requestSearch("dusk")
         }
         engine.onUserAction = { what -> magicshineController.requestSearch(what) }
+        ki2Bridge = Ki2Bridge(this) { channel, press -> onDi2Button(channel, press) }
 
         // After (re)binding, start over so every light gets its mode again.
         lightControl.onServiceReady = { discoverKarooLights() }
@@ -323,6 +328,7 @@ class LightPilotExtension : KarooExtension(EXTENSION_ID, BuildConfig.VERSION_NAM
         timeController.duskOffsetMinutes = newSettings.duskOffsetMinutes
         ambientLightSensor.nightThreshold = newSettings.ambientNightThresholdLux
         if (newSettings.useAmbientLight) ambientLightSensor.start() else ambientLightSensor.stop()
+        if (::ki2Bridge.isInitialized) ki2Bridge.setEnabled(newSettings.di2Enabled)
         magicshineController.assignedDeviceIds = newSettings.lights
             .filter { it.protocol == LightProtocol.BLE }
             .map { it.deviceId }
@@ -571,6 +577,27 @@ class LightPilotExtension : KarooExtension(EXTENSION_ID, BuildConfig.VERSION_NAM
         }
     }
 
+    // ---- Di2 buttons via Ki2 ----------------------------------------------------------
+
+    lateinit var ki2Bridge: Ki2Bridge
+        private set
+
+    private fun onDi2Button(channel: Int, press: Di2Press) {
+        val s = settings
+        if (!s.di2Enabled) return
+        val action = s.di2Actions[di2Key(channel, press)]
+            ?.let { name -> Di2Action.entries.firstOrNull { it.name == name } }
+            ?: Di2Action.NONE
+        Timber.d("$TAG: Di2 channel $channel ${press.name} -> ${action.name}")
+        when (action) {
+            Di2Action.NONE -> return
+            Di2Action.MANUAL_CYCLE -> engine.manualCycle()
+            Di2Action.FRONT_CYCLE -> engine.frontCycle()
+            Di2Action.BEAM_TOGGLE -> engine.beamToggle()
+        }
+        tapFeedback()
+    }
+
     // ---- Brake light measurement ------------------------------------------------------
 
     private var speedConsumerId: String? = null
@@ -731,6 +758,7 @@ class LightPilotExtension : KarooExtension(EXTENSION_ID, BuildConfig.VERSION_NAM
         Timber.d("$TAG: extension onDestroy")
         instance = null
         stopBrakeRecording()
+        if (::ki2Bridge.isInitialized) ki2Bridge.setEnabled(false)
         stopRadar()
         stopDiscoveryPolling()
         engine.destroy()
