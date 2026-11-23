@@ -40,9 +40,16 @@ Release-Notes unter **Releases**, gegliedert in New, Update und Fix.
   Auto-Pause erst nach 2 min (einstellbar bis 5 min).
 - **Fahrtende:** Licht aus.
 - **Sparmodus:** Bei niedrigem Akku ein sparsamerer Modus (abschaltbar).
+- **Verbindung der Magicshine:** LightPilot sucht die eingerichtete Lampe gezielt (nach Adresse
+  und Namen, verbunden wird nur mit der eingerichteten Adresse) und verbindet sich, sobald sie
+  sendet, auch wenn sie erst nach dem Karoo oder nach dem Fahrtstart eingeschaltet wird. Die
+  Suche läuft höchstens 5 min und wird neu angestoßen durch Fahrtstart, Tipp auf ein
+  LightPilot-Feld, Wechsel auf Nacht und Verbindungsabbruch; bei offener Einstellungsseite
+  durchgehend. Ist die Lampe verbunden, wird nicht gesucht. Sie bleibt auch im Standby
+  verbunden und lässt sich von der App einschalten.
 - **Anzeige:** Die Varia gilt als verbunden, solange ihr Radar Daten liefert (der Karoo meldet
-  für das Licht selbst keinen Zustand). Die Magicshine bleibt auch im Standby per Bluetooth
-  verbunden und lässt sich von der App einschalten. Akku farbig: grün (Magicshine 100–50 %,
+  für das Licht selbst keinen Zustand). Die Magicshine meldet weder Tastendrücke noch ihre
+  aktuelle Stufe; angezeigt wird die zuletzt gesendete. Akku farbig: grün (Magicshine 100–50 %,
   Varia neu/gut), gelb (49–20 %, Varia ok), rot (darunter, Varia niedrig/kritisch).
 - **Werkseinstellungen:** setzt Lichter-Zuordnung, Einstellungen, gespeicherte Position und
   Protokoll zurück (mit Bestätigungsabfrage). Die Kopplung im Karoo bleibt.
@@ -153,6 +160,12 @@ Abläufe am Tisch durch, das echte Radar wird dabei ignoriert:
 4. **Steuerung** wie das Datenfeld: Auto, Peloton, An, Aus, Hart aus und Frontlicht
 5. **Pause:** Pause-Taste, Auto-Pause, Weiterfahren
 
+Das Bluetooth-Protokoll der Magicshine EVO 1700 ist in `docs/magicshine-evo1700-protocol.md`
+beschrieben (ausgewertet aus einem Mitschnitt der Magicshine-App).
+
+Die Varia meldet ihren neuen Modus etwa 0,4 s nach dem tatsächlichen Umschalten zurück; für
+Zeitmessungen taugt die Rückmeldung daher nicht.
+
 **Protokoll öffnen** zeigt die letzten 1000 Einträge im Vollbild, neueste oben, mit Filter
 (Alle, Steuerung, Magicshine, System) und Anhalten. **Exportieren** speichert das ganze
 Protokoll als Textdatei auf dem Karoo; am Rechner holen mit adb (unter Linux im Paket
@@ -164,12 +177,10 @@ adb pull /sdcard/Android/data/io.github.opaunke82.lightpilot/files/
 
 ## Offene Punkte
 
-- **Magicshine EVO 1700:** Das Protokoll ist aus einem Mitschnitt der Magicshine-App ausgewertet
-  (`docs/magicshine-evo1700-protocol.md`). Die Lampe meldet weder Tastendrücke noch ihre aktuelle
-  Stufe; LightPilot zeigt deshalb die zuletzt gesendete Stufe. Bis v0.1.x hat LightPilot das
-  Fernlicht geschaltet, ab v0.2.0 werden alte Einstellungen auf Abblendlicht umgestellt.
-- **Rückmeldung des Varia:** Die App liest den gemeldeten Modus aus den LightParameters des Karoo.
-  Ob der Karoo diese bei jeder Änderung schickt, ist ungeprüft. Im Protokoll: Zeilen „Reported mode“.
+- **Bremslicht:** in Prüfung. Der Karoo stellt Beschleunigungssensor, Gyroskop und lineare
+  Beschleunigung für Apps bereit. Gemessen: Befehl bis Licht an der Varia etwa 0,1–0,35 s
+  (Latenztest mit Video). Offen: Erkennungszeit und Fehlauslösungen aus einer Bremsfahrt
+  (Bremslicht-Messung unter „Test und Diagnose“). Grenze: insgesamt höchstens 0,5 s.
 - **Varia ohne Radar:** Die Verbindung der Varia wird über ihr Radar erkannt. Ist das Radar am
   Karoo abgeschaltet und nur das Licht in Betrieb, zeigt die App sie als „nicht verbunden“.
 - **Inoffizielle Schnittstelle:** Das Schalten der ANT+-Lichter nutzt eine nicht dokumentierte
