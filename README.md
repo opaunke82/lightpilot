@@ -51,6 +51,12 @@ Release-Notes unter **Releases**, gegliedert in New, Update und Fix.
   für das Licht selbst keinen Zustand). Die Magicshine meldet weder Tastendrücke noch ihre
   aktuelle Stufe; angezeigt wird die zuletzt gesendete. Akku farbig: grün (Magicshine 100–50 %,
   Varia neu/gut), gelb (49–20 %, Varia ok), rot (darunter, Varia niedrig/kritisch).
+- **Shimano-Di2-Tasten (über Ki2):** eigene Seite „Di2-Tasten (Ki2)“, Standard aus. LightPilot
+  hört bei der Extension Ki2 mit, die die Verbindung zur Di2 hält, und bekommt die Tasten als
+  D-Fly-Kanal 1–4 mit Druckart (einfach, doppelt, halten). Jede Kombination lässt sich mit einer
+  der drei LightPilot-Aktionen belegen. Damit Ki2 nicht zusätzlich reagiert, die Druckart in Ki2
+  auf „No Action“ stellen. SRAM AXS braucht das nicht: Bonus Buttons und Blips lassen sich am
+  Karoo unter „Sensoren“ → AXS → „Configure Controls“ direkt mit LightPilot-Aktionen belegen.
 - **Werkseinstellungen:** setzt Lichter-Zuordnung, Einstellungen, gespeicherte Position und
   Protokoll zurück (mit Bestätigungsabfrage). Die Kopplung im Karoo bleibt.
 
