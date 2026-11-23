@@ -323,6 +323,9 @@ class LightPilotExtension : KarooExtension(EXTENSION_ID, BuildConfig.VERSION_NAM
             .filter { it.protocol == LightProtocol.BLE }
             .map { it.deviceId }
             .toSet()
+        magicshineController.assignedNames = newSettings.lights
+            .filter { it.protocol == LightProtocol.BLE }
+            .associate { it.deviceId to it.deviceName }
         engine.updateSettings(newSettings)
         if (lightsNeeded || settingsUiActive) startBle()
     }
@@ -404,6 +407,7 @@ class LightPilotExtension : KarooExtension(EXTENSION_ID, BuildConfig.VERSION_NAM
     /** The engine starts working: claim the light session, find lights, start radar. */
     private fun onLightsNeeded() {
         lightsNeeded = true
+        magicshineController.searchActive = true
         lightControl.bind()
         startDiscoveryPolling()
         startBle()
@@ -413,6 +417,7 @@ class LightPilotExtension : KarooExtension(EXTENSION_ID, BuildConfig.VERSION_NAM
     /** The engine is done: give the lights back to the Karoo. */
     private fun onLightsReleased() {
         lightsNeeded = false
+        magicshineController.searchActive = settingsUiActive
         stopRadar()
         if (!settingsUiActive) {
             stopDiscoveryPolling()
@@ -423,6 +428,7 @@ class LightPilotExtension : KarooExtension(EXTENSION_ID, BuildConfig.VERSION_NAM
 
     fun setSettingsUiActive(active: Boolean) {
         settingsUiActive = active
+        magicshineController.searchActive = active || lightsNeeded
         if (active) {
             lightControl.bind()
             startDiscoveryPolling()

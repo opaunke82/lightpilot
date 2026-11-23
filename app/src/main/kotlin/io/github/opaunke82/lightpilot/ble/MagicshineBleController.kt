@@ -42,11 +42,12 @@ class MagicshineBleController(context: Context) : LightController {
         private const val TAG = "MagicshineBle"
         private const val WRITE_RETRIES = 5
         private const val WRITE_RETRY_DELAY_MS = 60L
-        private const val RECONNECT_MIN_MS = 10_000L
-        private const val RECONNECT_MAX_MS = 60_000L
-        /** After this many failed attempts in a row, look for the light with a short scan. */
-        private const val SCAN_AFTER_FAILURES = 2
-        private const val RECONNECT_SCAN_MS = 10_000L
+        /** First search window after the light is needed: fast scan. */
+        private const val SEARCH_FAST_MS = 60_000L
+        /** Later search windows: balanced scan, less battery. */
+        private const val SEARCH_SLOW_MS = 120_000L
+        /** Pause after a failed connection although the light was seen. */
+        private const val RETRY_AFTER_FAILED_CONNECT_MS = 2_000L
     }
 
     private val appContext = context.applicationContext
@@ -82,6 +83,15 @@ class MagicshineBleController(context: Context) : LightController {
             ?.adapter?.bluetoothLeScanner
 
     var assignedDeviceIds: Set<String> = emptySet()
+
+    /**
+     * Search for assigned lights that are not connected only while LightPilot needs them
+     * (ride or settings page). Existing connections are kept either way.
+     */
+    @Volatile var searchActive: Boolean = false
+
+    /** Advertised names of the assigned lights (from the settings), for the scan filter. */
+    var assignedNames: Map<String, String> = emptyMap()
 
     fun startDiscovery() {
         if (scanCallback != null) return
@@ -173,11 +183,12 @@ class MagicshineBleController(context: Context) : LightController {
     }
 
     /**
-     * Short scan for one known light. Android connects by address reliably only to devices it
-     * has seen recently (after a restart it no longer knows the address type), so after failed
-     * attempts the light is looked for first. Returns true if it advertises.
+     * Scan for one known light until it advertises or [timeoutMs] ends. Android connects by
+     * address only to devices it has seen since Bluetooth started: the Magicshine uses a
+     * random address, and without a scan the stack tries it as a public one and never
+     * connects (light switched on after the Karoo, 23.11.2026). Returns true if seen.
      */
-    private suspend fun scanFor(address: String): Boolean {
+    private suspend fun scanFor(address: String, timeoutMs: Long, fast: Boolean): Boolean {
         val scanner = bleScanner ?: return false
         val found = CompletableDeferred<String?>()
         val callback = object : android.bluetooth.le.ScanCallback() {
@@ -191,15 +202,24 @@ class MagicshineBleController(context: Context) : LightController {
             }
         }
         return try {
-            val filter = android.bluetooth.le.ScanFilter.Builder().setDeviceAddress(address).build()
+            // Address and name filter (either may match): on Android 12 the hardware address
+            // filter does not reliably match random addresses, the name filter does. The
+            // callback still checks the address. A filter is needed so the scan keeps running
+            // with the screen off.
+            val filters = listOfNotNull(
+                android.bluetooth.le.ScanFilter.Builder().setDeviceAddress(address).build(),
+                assignedNames[address]?.let { android.bluetooth.le.ScanFilter.Builder().setDeviceName(it).build() },
+            )
             val settings = android.bluetooth.le.ScanSettings.Builder()
-                .setScanMode(android.bluetooth.le.ScanSettings.SCAN_MODE_LOW_LATENCY)
+                .setScanMode(
+                    if (fast) android.bluetooth.le.ScanSettings.SCAN_MODE_LOW_LATENCY
+                    else android.bluetooth.le.ScanSettings.SCAN_MODE_BALANCED,
+                )
                 .build()
-            scanner.startScan(listOf(filter), settings, callback)
-            val result = withTimeoutOrNull(RECONNECT_SCAN_MS) { found.await() }
+            scanner.startScan(filters, settings, callback)
+            val result = withTimeoutOrNull(timeoutMs) { found.await() }
             val seen = result != null
             if (!result.isNullOrEmpty() && !devices.containsKey(address)) registerFoundDevice(address, result)
-            Timber.d("$TAG: Reconnect scan for $address: ${if (seen) "found" else "not found (light off or connected elsewhere)"}")
             seen
         } catch (e: Exception) {
             Timber.w(e, "$TAG: Reconnect scan error")
@@ -210,27 +230,38 @@ class MagicshineBleController(context: Context) : LightController {
     }
 
     /**
-     * Keeps an assigned light connected: retries as long as it is assigned and not
-     * connected, so a light that drops (out of range / powered off) reconnects by
-     * itself once it is reachable again — without needing the scanner to be running.
+     * Keeps an assigned light connected as long as it is assigned: first wait until the light
+     * advertises (filtered scan for its address), then connect at once. A light switched on
+     * later, one that comes back into range or reconnects after a drop is picked up within
+     * about a second; there is no blind connecting by address any more.
      */
     private fun startConnectionSupervisor(address: String) {
         if (connectionJobs[address]?.isActive == true) return
         connectionJobs[address] = scope.launch {
             Timber.d("$TAG: Keeping $address connected")
-            var backoff = RECONNECT_MIN_MS
-            var failures = 0
+            var searchingSince = System.currentTimeMillis()
+            var reportedWaiting = false
             while (isActive && address in assignedDeviceIds) {
-                if (failures >= SCAN_AFTER_FAILURES && failures % SCAN_AFTER_FAILURES == 0) scanFor(address)
-                val wasConnected = attemptConnect(address)
-                if (wasConnected) {
-                    failures = 0
-                    backoff = RECONNECT_MIN_MS
-                } else {
-                    failures++
-                    backoff = minOf(backoff * 2, RECONNECT_MAX_MS)
+                if (!searchActive) {
+                    delay(2_000)
+                    searchingSince = System.currentTimeMillis()
+                    continue
                 }
-                delay(backoff)
+                val fast = System.currentTimeMillis() - searchingSince < SEARCH_FAST_MS
+                val seen = scanFor(address, if (fast) SEARCH_FAST_MS else SEARCH_SLOW_MS, fast)
+                if (!seen) {
+                    if (!reportedWaiting) {
+                        Timber.d("$TAG: Waiting for $address to advertise (light off, asleep or connected to another device)")
+                        reportedWaiting = true
+                    }
+                    continue
+                }
+                Timber.d("$TAG: $address advertises, connecting")
+                reportedWaiting = false
+                val wasConnected = attemptConnect(address)
+                if (!wasConnected) delay(RETRY_AFTER_FAILED_CONNECT_MS)
+                // After a connection or a failed attempt: search fast again.
+                searchingSince = System.currentTimeMillis()
             }
         }
     }
