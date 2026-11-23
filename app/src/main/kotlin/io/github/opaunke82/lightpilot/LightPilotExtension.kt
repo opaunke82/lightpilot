@@ -195,7 +195,11 @@ class LightPilotExtension : KarooExtension(EXTENSION_ID, BuildConfig.VERSION_NAM
         engine = LightPilotEngine(io = lightIo, zoneProvider = ::currentZone)
         engine.onActive = { onLightsNeeded() }
         engine.onIdle = { onLightsReleased() }
-        engine.onZoneChange = { zone -> notifyZone(zone) }
+        engine.onZoneChange = { zone ->
+            notifyZone(zone)
+            if (zone == Zone.NIGHT) magicshineController.requestSearch("dusk")
+        }
+        engine.onUserAction = { what -> magicshineController.requestSearch(what) }
 
         // After (re)binding, start over so every light gets its mode again.
         lightControl.onServiceReady = { discoverKarooLights() }
@@ -407,7 +411,8 @@ class LightPilotExtension : KarooExtension(EXTENSION_ID, BuildConfig.VERSION_NAM
     /** The engine starts working: claim the light session, find lights, start radar. */
     private fun onLightsNeeded() {
         lightsNeeded = true
-        magicshineController.searchActive = true
+        magicshineController.lightsNeeded = true
+        magicshineController.requestSearch("ride start")
         lightControl.bind()
         startDiscoveryPolling()
         startBle()
@@ -417,7 +422,8 @@ class LightPilotExtension : KarooExtension(EXTENSION_ID, BuildConfig.VERSION_NAM
     /** The engine is done: give the lights back to the Karoo. */
     private fun onLightsReleased() {
         lightsNeeded = false
-        magicshineController.searchActive = settingsUiActive
+        magicshineController.lightsNeeded = false
+        magicshineController.stopSearch()
         stopRadar()
         if (!settingsUiActive) {
             stopDiscoveryPolling()
@@ -428,7 +434,7 @@ class LightPilotExtension : KarooExtension(EXTENSION_ID, BuildConfig.VERSION_NAM
 
     fun setSettingsUiActive(active: Boolean) {
         settingsUiActive = active
-        magicshineController.searchActive = active || lightsNeeded
+        magicshineController.searchWhileOpen = active
         if (active) {
             lightControl.bind()
             startDiscoveryPolling()

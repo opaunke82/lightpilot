@@ -110,6 +110,9 @@ class LightPilotEngine(
     /** Called when the engine starts needing the lights. */
     var onActive: (() -> Unit)? = null
 
+    /** Called on every tap on a LightPilot field or button (the lights are asked for). */
+    var onUserAction: ((String) -> Unit)? = null
+
     private fun now() = System.currentTimeMillis()
 
     private fun post(block: () -> Unit) {
@@ -159,6 +162,7 @@ class LightPilotEngine(
     }
 
     fun manualCycle() = post {
+        onUserAction?.invoke("status field")
         apply(BrainEvent.ManualCycle)
         evaluate()
     }
@@ -167,6 +171,7 @@ class LightPilotEngine(
     fun frontCycle() = post {
         val front = settings.lights.firstOrNull { it.role == LightRole.FRONT && it.fieldModes.isNotEmpty() }
             ?: return@post
+        onUserAction?.invoke("front field")
         apply(BrainEvent.FieldCycle(front.toCore(), now()))
         evaluate()
     }
@@ -174,6 +179,7 @@ class LightPilotEngine(
     /** Beam field tap: switch the first front light with beams between low and high beam. */
     fun beamToggle() = post {
         val front = settings.lights.firstOrNull { it.role == LightRole.FRONT && it.hasBeams() } ?: return@post
+        onUserAction?.invoke("beam field")
         apply(BrainEvent.BeamToggle(front.toCore(), now()))
         evaluate()
     }
@@ -236,6 +242,7 @@ class LightPilotEngine(
 
     /** Sets the manual mode directly (simulation page), instead of cycling. */
     fun setManual(mode: ManualMode) = post {
+        onUserAction?.invoke("manual $mode")
         apply(BrainEvent.ManualSet(mode))
         evaluate()
     }

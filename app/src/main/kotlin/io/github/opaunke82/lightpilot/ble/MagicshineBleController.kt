@@ -42,7 +42,9 @@ class MagicshineBleController(context: Context) : LightController {
         private const val TAG = "MagicshineBle"
         private const val WRITE_RETRIES = 5
         private const val WRITE_RETRY_DELAY_MS = 60L
-        /** First search window after the light is needed: fast scan. */
+        /** One search window; after that the next trigger opens a new one. */
+        private const val SEARCH_WINDOW_MS = 5 * 60_000L
+        /** Start of a window: fast scan. */
         private const val SEARCH_FAST_MS = 60_000L
         /** Later search windows: balanced scan, less battery. */
         private const val SEARCH_SLOW_MS = 120_000L
@@ -85,10 +87,29 @@ class MagicshineBleController(context: Context) : LightController {
     var assignedDeviceIds: Set<String> = emptySet()
 
     /**
-     * Search for assigned lights that are not connected only while LightPilot needs them
-     * (ride or settings page). Existing connections are kept either way.
+     * Searching for an assigned light that is not connected costs power, so it runs in
+     * windows of [SEARCH_WINDOW_MS] that [requestSearch] opens (ride start, a tap on a
+     * LightPilot field, dusk, a dropped connection). While the settings page is open
+     * ([searchWhileOpen]) it runs throughout. Existing connections are kept either way.
      */
-    @Volatile var searchActive: Boolean = false
+    @Volatile private var searchUntilMs = 0L
+    @Volatile var searchWhileOpen: Boolean = false
+    /** Lights are needed (ride or simulation); outside of that no window is opened. */
+    @Volatile var lightsNeeded: Boolean = false
+
+    fun requestSearch(reason: String) {
+        if (!lightsNeeded) return
+        val notConnected = assignedDeviceIds.filter { !characteristics.containsKey(it) }
+        if (notConnected.isEmpty()) return
+        searchUntilMs = System.currentTimeMillis() + SEARCH_WINDOW_MS
+        Timber.d("$TAG: Searching up to ${SEARCH_WINDOW_MS / 60_000} min ($reason)")
+    }
+
+    fun stopSearch() {
+        searchUntilMs = 0
+    }
+
+    private fun searchAllowed() = searchWhileOpen || System.currentTimeMillis() < searchUntilMs
 
     /** Advertised names of the assigned lights (from the settings), for the scan filter. */
     var assignedNames: Map<String, String> = emptyMap()
@@ -241,14 +262,23 @@ class MagicshineBleController(context: Context) : LightController {
             Timber.d("$TAG: Keeping $address connected")
             var searchingSince = System.currentTimeMillis()
             var reportedWaiting = false
+            var searching = false
             while (isActive && address in assignedDeviceIds) {
-                if (!searchActive) {
-                    delay(2_000)
-                    searchingSince = System.currentTimeMillis()
+                if (!searchAllowed()) {
+                    if (searching) Timber.d("$TAG: Search for $address paused until the next request")
+                    searching = false
+                    reportedWaiting = false
+                    delay(1_000)
                     continue
                 }
-                val fast = System.currentTimeMillis() - searchingSince < SEARCH_FAST_MS
-                val seen = scanFor(address, if (fast) SEARCH_FAST_MS else SEARCH_SLOW_MS, fast)
+                if (!searching) {
+                    searching = true
+                    searchingSince = System.currentTimeMillis()
+                }
+                val now = System.currentTimeMillis()
+                val fast = now - searchingSince < SEARCH_FAST_MS
+                val left = if (searchWhileOpen) SEARCH_SLOW_MS else (searchUntilMs - now).coerceAtLeast(1_000)
+                val seen = scanFor(address, minOf(if (fast) SEARCH_FAST_MS else SEARCH_SLOW_MS, left), fast)
                 if (!seen) {
                     if (!reportedWaiting) {
                         Timber.d("$TAG: Waiting for $address to advertise (light off, asleep or connected to another device)")
@@ -260,6 +290,8 @@ class MagicshineBleController(context: Context) : LightController {
                 reportedWaiting = false
                 val wasConnected = attemptConnect(address)
                 if (!wasConnected) delay(RETRY_AFTER_FAILED_CONNECT_MS)
+                // A connection that dropped: look for the light again for one window.
+                if (wasConnected) requestSearch("connection lost")
                 // After a connection or a failed attempt: search fast again.
                 searchingSince = System.currentTimeMillis()
             }

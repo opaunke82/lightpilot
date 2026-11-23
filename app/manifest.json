@@ -7,5 +7,5 @@
   "latestVersionCode": 15,
   "developer": "opaunke82",
   "description": "Lichtsteuerung für Garmin Varia (ANT+) und Magicshine EVO 1700 (Bluetooth): nachts blinken, tagsüber nur bei Annäherung, Sparmodus, Pause-Regeln.",
-  "releaseNotes": "Magicshine verbindet sich, sobald sie eingeschaltet wird, auch wenn sie nach dem Karoo eingeschaltet wurde."
+  "releaseNotes": "Magicshine verbindet sich, sobald sie eingeschaltet wird; Suche in 5-Minuten-Fenstern (Fahrtstart, Feld-Tipp, Dämmerung, Verbindungsabbruch)."
 }
