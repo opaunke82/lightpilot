@@ -45,7 +45,7 @@ eine **Druckart**, die Ki2 nicht nutzt.
 
 ### 4. LightPilot einrichten (Karoo, LightPilot)
 
-1. LightPilot öffnen → Reiter **Bedienung** → **Datenfelder & Tasten** → Abschnitt **Shimano Di2 (über Ki2)**.
+1. LightPilot öffnen → Reiter **Tasten** → **Datenfelder & Tasten** → Abschnitt **Shimano Di2 (über Ki2)**.
 2. **Di2-Tasten verwenden** einschalten. Der Status wechselt auf **mit Ki2 verbunden**.
 3. Jede Hood-Taste einmal mit der gewählten Druckart drücken. Unter **Letzte Taste** steht z. B.
    „Kanal 1 · Doppelt“. So siehst du, welche Taste welcher Kanal ist.
@@ -62,7 +62,7 @@ eine **Druckart**, die Ki2 nicht nutzt.
 
 ### 5. Testen
 
-1. In LightPilot unter Reiter **Werkzeuge** → **Test & Simulation** die Simulation einschalten und unter **1. Fahrt**
+1. In LightPilot unter Reiter **Extras** → **Test & Simulation** die Simulation einschalten und unter **1. Fahrt**
    starten (oder eine echte Fahrt starten). Außerhalb einer Fahrt reagiert das Licht nicht.
 2. Die belegten Hood-Tasten drücken: Der Karoo piept kurz, das Licht reagiert.
 3. Ki2 darf bei dieser Druckart nichts tun (kein Seitenwechsel o. Ä.).
@@ -72,7 +72,7 @@ eine **Druckart**, die Ki2 nicht nutzt.
 | Anzeige / Verhalten | Ursache und Abhilfe |
 | --- | --- |
 | Status **Ki2 ist nicht installiert** | Ki2 installieren (Schritt 2), dann LightPilot neu öffnen. |
-| Status bleibt **verbinde mit Ki2 …** | Ki2 einmal öffnen, dann den Schalter in LightPilot aus- und wieder einschalten. Sonst unter **Werkzeuge** → **Diagnose** das Protokoll ansehen (Filter „Alle“) und die Zeilen von `Ki2Bridge` ansehen. |
+| Status bleibt **verbinde mit Ki2 …** | Ki2 einmal öffnen, dann den Schalter in LightPilot aus- und wieder einschalten. Sonst unter **Extras** → **Diagnose** das Protokoll ansehen (Filter „Alle“) und die Zeilen von `Ki2Bridge` ansehen. |
 | Status **Ki2-Version passt nicht** | Ki2 hat seine Schnittstelle geändert. LightPilot muss angepasst werden, bitte melden. |
 | **Letzte Taste** bleibt „–“ | Di2 nicht mit Ki2 verbunden oder Hood-Taste hat keinen D-Fly-Kanal (Schritt 1). In Ki2 unter **D-Fly Channel Status** prüfen. |
 | Taste wird angezeigt, aber nichts passiert | Keine Aktion für diesen Kanal und diese Druckart gewählt, oder keine Fahrt aktiv. |

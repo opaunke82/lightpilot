@@ -204,8 +204,8 @@ private const val KEY_TAB = "tab"
 /** Tabs of the start page; tapping the open tab again shows the status. */
 private enum class Tab(val label: String) {
     LIGHT("Licht"),
-    CONTROLS("Bedienung"),
-    TOOLS("Werkzeuge"),
+    CONTROLS("Tasten"),
+    TOOLS("Extras"),
 }
 
 /** Entries of a tab; each opens exactly one page. */
