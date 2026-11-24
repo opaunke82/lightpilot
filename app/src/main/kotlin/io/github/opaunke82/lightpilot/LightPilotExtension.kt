@@ -326,8 +326,11 @@ class LightPilotExtension : KarooExtension(EXTENSION_ID, BuildConfig.VERSION_NAM
         settings = newSettings
         timeController.dawnOffsetMinutes = newSettings.dawnOffsetMinutes
         timeController.duskOffsetMinutes = newSettings.duskOffsetMinutes
-        ambientLightSensor.nightThreshold = newSettings.ambientNightThresholdLux
-        if (newSettings.useAmbientLight) ambientLightSensor.start() else ambientLightSensor.stop()
+        ambientLightSensor.onBelowLux = newSettings.tunnelOnBelowLux
+        ambientLightSensor.offAboveLux = maxOf(newSettings.tunnelOffAboveLux, newSettings.tunnelOnBelowLux + 1)
+        ambientLightSensor.onDelayMs = newSettings.tunnelOnDelaySeconds * 1_000L
+        ambientLightSensor.offDelayMs = newSettings.tunnelOffDelaySeconds * 1_000L
+        updateTunnelActive()
         if (::ki2Bridge.isInitialized) ki2Bridge.setEnabled(newSettings.di2Enabled)
         magicshineController.assignedDeviceIds = newSettings.lights
             .filter { it.protocol == LightProtocol.BLE }
@@ -340,10 +343,16 @@ class LightPilotExtension : KarooExtension(EXTENSION_ID, BuildConfig.VERSION_NAM
         if (lightsNeeded || settingsUiActive) startBle()
     }
 
+    /** The light sensor runs only with tunnel mode on and while it matters (ride or settings page). */
+    private fun updateTunnelActive() {
+        if (!::ambientLightSensor.isInitialized) return
+        ambientLightSensor.setActive(settings.tunnelEnabled && (lightsNeeded || settingsUiActive))
+    }
+
     private fun currentZone(): Zone {
         val s = settings
         val timeZone = if (s.useTimeBased) timeController.getCurrentZone() else Zone.DAY
-        if (!s.useAmbientLight || !ambientLightSensor.isAvailable) return timeZone
+        if (!s.tunnelEnabled || !ambientLightSensor.isAvailable) return timeZone
         val sensorZone = ambientLightSensor.currentLightZone.value
         // With both on, the light sensor can only make it darker (tunnel, forest), T2.
         return if (s.useTimeBased) {
@@ -417,6 +426,7 @@ class LightPilotExtension : KarooExtension(EXTENSION_ID, BuildConfig.VERSION_NAM
     /** The engine starts working: claim the light session, find lights, start radar. */
     private fun onLightsNeeded() {
         lightsNeeded = true
+        updateTunnelActive()
         magicshineController.lightsNeeded = true
         magicshineController.requestSearch("ride start")
         lightControl.bind()
@@ -428,6 +438,7 @@ class LightPilotExtension : KarooExtension(EXTENSION_ID, BuildConfig.VERSION_NAM
     /** The engine is done: give the lights back to the Karoo. */
     private fun onLightsReleased() {
         lightsNeeded = false
+        updateTunnelActive()
         magicshineController.lightsNeeded = false
         magicshineController.stopSearch()
         stopRadar()
@@ -440,6 +451,7 @@ class LightPilotExtension : KarooExtension(EXTENSION_ID, BuildConfig.VERSION_NAM
 
     fun setSettingsUiActive(active: Boolean) {
         settingsUiActive = active
+        updateTunnelActive()
         magicshineController.searchWhileOpen = active
         if (active) {
             lightControl.bind()
@@ -764,7 +776,7 @@ class LightPilotExtension : KarooExtension(EXTENSION_ID, BuildConfig.VERSION_NAM
         engine.destroy()
         magicshineController.destroy()
         lightControl.unbind()
-        ambientLightSensor.stop()
+        ambientLightSensor.setActive(false)
         karooSystem.dispatch(ReleaseBluetooth(extension))
         karooSystem.disconnect()
         extensionScope.cancel()

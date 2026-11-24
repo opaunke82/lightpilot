@@ -106,8 +106,12 @@ data class AppSettings(
     val dawnOffsetMinutes: Int = 0,
     /** Minutes added to sunset for the start of the night zone (negative = earlier, T1). */
     val duskOffsetMinutes: Int = -30,
-    val useAmbientLight: Boolean = false,
-    val ambientNightThresholdLux: Int = 50,
+    /** Tunnel mode (ambient light sensor). Off by default; new keys since v0.3.1. */
+    val tunnelEnabled: Boolean = false,
+    val tunnelOnBelowLux: Int = 300,
+    val tunnelOffAboveLux: Int = 600,
+    val tunnelOnDelaySeconds: Int = 2,
+    val tunnelOffDelaySeconds: Int = 10,
     val radarMinThreatLevel: Int = 1,
     val radarHoldSeconds: Int = 3,
     val radarWatchdogSeconds: Int = 5,

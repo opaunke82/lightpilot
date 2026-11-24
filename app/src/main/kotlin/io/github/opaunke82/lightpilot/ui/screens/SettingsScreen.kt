@@ -115,6 +115,7 @@ fun SettingsScreen(
     di2LastButton: String?,
     status: EngineStatus,
     currentLux: Float,
+    tunnelLive: String,
     sunrise: Calendar?,
     sunset: Calendar?,
     sunSource: String,
@@ -184,6 +185,19 @@ fun SettingsScreen(
 
         Section("Tag und Nacht") {
             DayNightBlock(settings, currentLux, sunrise, sunset, sunSource, actions.save)
+            Spacer(Modifier.height(8.dp))
+            var showTunnel by remember { mutableStateOf(false) }
+            Text("Tunnelmodus", style = MaterialTheme.typography.labelMedium)
+            Note(
+                if (settings.tunnelEnabled) {
+                    "an · Nacht unter ${settings.tunnelOnBelowLux} lx (${settings.tunnelOnDelaySeconds} s), " +
+                        "Tag über ${settings.tunnelOffAboveLux} lx (${settings.tunnelOffDelaySeconds} s)"
+                } else {
+                    "aus · Lichtsensor schaltet in Tunnel und Wald auf Nacht"
+                },
+            )
+            OutlinedButton(onClick = { showTunnel = true }, modifier = Modifier.fillMaxWidth()) { Text("Tunnelmodus öffnen") }
+            if (showTunnel) TunnelScreen(settings, tunnelLive, actions.save) { showTunnel = false }
         }
 
         Section("Radar") {
@@ -257,6 +271,11 @@ fun SettingsScreen(
             }
             if (showLog) LogViewer(onClose = { showLog = false })
             exportInfo?.let { Note("Gespeichert: $it") }
+
+            Spacer(Modifier.height(12.dp))
+            Text("Tunnelmodus live", style = MaterialTheme.typography.labelMedium)
+            Note(if (settings.tunnelEnabled) tunnelLive else "Tunnelmodus ist aus (Abschnitt „Tag und Nacht“).")
+            Note("Test: Karoo mit einem Buch abdecken (→ Nacht) oder mit einer Taschenlampe anleuchten (→ Tag).")
 
             Spacer(Modifier.height(12.dp))
             Text("Bremslicht-Messung", style = MaterialTheme.typography.labelMedium)
@@ -443,15 +462,6 @@ private fun DayNightBlock(
             save(settings.copy(duskOffsetMinutes = it))
         }
         Note("Nacht ab ${shifted(sunset, settings.duskOffsetMinutes)}")
-    }
-    SwitchRow("Umgebungslichtsensor (Tunnel, Wald)", settings.useAmbientLight) {
-        save(settings.copy(useAmbientLight = it))
-    }
-    if (settings.useAmbientLight) {
-        Note("Aktuell: %.0f lx. Mit Sonnenzeiten zusammen schaltet der Sensor nur auf Nacht.".format(lux))
-        IntSlider("Nacht unter", settings.ambientNightThresholdLux, 10..500, "lx") {
-            save(settings.copy(ambientNightThresholdLux = it))
-        }
     }
 }
 

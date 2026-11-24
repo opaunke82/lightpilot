@@ -81,6 +81,7 @@ class MainActivity : ComponentActivity() {
                 val di2LastButton = ext?.ki2Bridge?.lastButton?.collectAsState()?.value
                 val status = ext?.engine?.status?.collectAsState()?.value ?: EngineStatus()
                 val lux = ext?.ambientLightSensor?.currentLux?.collectAsState()?.value ?: 0f
+                val tunnelLive = ext?.ambientLightSensor?.live?.collectAsState()?.value ?: "aus"
                 val exportInfo = remember { mutableStateOf<String?>(null) }
 
                 SettingsScreen(
@@ -92,6 +93,7 @@ class MainActivity : ComponentActivity() {
                     di2LastButton = di2LastButton,
                     status = status,
                     currentLux = lux,
+                    tunnelLive = tunnelLive,
                     sunrise = ext?.timeController?.getSunriseTime(),
                     sunset = ext?.timeController?.getSunsetTime(),
                     sunSource = when (ext?.timeController?.source) {

@@ -14,7 +14,11 @@ Release-Notes unter **Releases**, gegliedert in New, Update und Fix.
 - **Tag oder Nacht:** nach Sonnenauf- und -untergang, Nacht ab 30 min vor Sonnenuntergang
   (beides einstellbar). Ohne GPS-Fix rechnet die App mit der letzten bekannten Position, gab es
   noch nie GPS, mit einer Schätzung aus der Zeitzone. Die Sonnenzeiten werden täglich neu
-  berechnet. Optional zusätzlich mit dem Lichtsensor des Karoo.
+  berechnet.
+- **Tunnelmodus (optional, Standard aus):** Der Lichtsensor des Karoo schaltet in Tunnel und Wald
+  auf Nacht: Nacht, wenn es 2 s lang dunkler als 300 lx ist, Tag, wenn es 10 s lang heller als
+  600 lx ist (alles einstellbar, eigene Seite unter „Tag und Nacht“, Live-Anzeige unter „Test und
+  Diagnose“). Ausführlich: [docs/tunnelmodus.md](docs/tunnelmodus.md).
 - **Haltezeit:** Nach dem letzten Fahrzeug bleibt die Warnung 3 s an (einstellbar 0–10 s).
 - **Watchdog:** Kommen 5 s lang keine Radardaten, endet die Warnung. Nichts bleibt hängen.
 - **Statusfeld:** Tippen schaltet reihum Automatik → Peloton → An → Aus → Hart aus.

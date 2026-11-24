@@ -1,5 +1,5 @@
-// Derived from KarooFirefly (https://github.com/derstrassi/karoofirefly),
-// Copyright (c) 2026 derstrassi, MIT License. Adapted for LightPilot.
+// Originally derived from KarooFirefly (https://github.com/derstrassi/karoofirefly),
+// Copyright (c) 2026 derstrassi, MIT License. Rewritten for LightPilot (tunnel mode).
 
 package io.github.opaunke82.lightpilot.engine
 
@@ -8,100 +8,150 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
-import io.github.opaunke82.lightpilot.data.DayTimeZone
+import android.os.Handler
+import android.os.Looper
+import android.os.SystemClock
+import io.github.opaunke82.lightpilot.core.Zone
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import timber.log.Timber
+import java.util.Locale
 
 /**
- * Wrapper around Android's ambient light sensor (TYPE_LIGHT).
+ * Tunnel mode: the Karoo's ambient light sensor switches to night in tunnels and dark forest.
  *
- * Provides smoothed lux readings and a categorized light level with hysteresis
- * to avoid rapid zone switching.
+ * The sensor (Lite-On LTR-X130A on the Karoo 3) reports only when the value changes, so the
+ * last value is held and evaluated every [TICK_MS] instead of on sensor events. That gives
+ * fixed times:
+ *  - DAY → NIGHT when the light stays below [onBelowLux] for [onDelayMs],
+ *  - NIGHT → DAY when it stays above [offAboveLux] for [offDelayMs] (hysteresis between both).
+ * Runs only while [setActive] says so (tunnel mode on and lights needed or settings open).
  */
 class AmbientLightSensor(context: Context) : SensorEventListener {
 
-    companion object {
-        private const val SMOOTHING_WINDOW_SIZE = 10 // ~2s at ~5Hz sensor rate
-        private const val MIN_DWELL_TIME_MS = 10_000L // minimum time before zone can change
-        private const val DAY_LOCKOUT_MS = 120_000L // after switching to NIGHT, block NIGHT→DAY for this long
-    }
-
     private val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
     private val lightSensor: Sensor? = sensorManager.getDefaultSensor(Sensor.TYPE_LIGHT)
+    private val handler = Handler(Looper.getMainLooper())
+
+    val isAvailable: Boolean get() = lightSensor != null
+
+    var onBelowLux = 300
+    var offAboveLux = 600
+    var onDelayMs = 2_000L
+    var offDelayMs = 10_000L
 
     private val _currentLux = MutableStateFlow(0f)
     val currentLux: StateFlow<Float> = _currentLux
 
-    private val _currentLightZone = MutableStateFlow(DayTimeZone.DAY)
-    val currentLightZone: StateFlow<DayTimeZone> = _currentLightZone
+    private val _currentLightZone = MutableStateFlow(Zone.DAY)
+    val currentLightZone: StateFlow<Zone> = _currentLightZone
 
-    private val luxBuffer = ArrayDeque<Float>(SMOOTHING_WINDOW_SIZE)
-    private var lastZoneChangeTime = 0L
+    private val _live = MutableStateFlow("aus")
+    /** Live state for the test section, e.g. "212 lx · Tag · dunkel seit 1,2 s → Nacht in 0,8 s". */
+    val live: StateFlow<String> = _live
 
-    var nightThreshold: Int = 50
+    @Volatile private var lastLux: Float? = null
+    private var darkSinceMs: Long? = null
+    private var brightSinceMs: Long? = null
+    private var active = false
 
-    val isAvailable: Boolean get() = lightSensor != null
-
-    private var running = false
-
-    fun start() {
-        if (running) return
-        if (lightSensor == null) {
-            Timber.w("AmbientLightSensor: No light sensor available on this device")
-            return
+    private val tick = object : Runnable {
+        override fun run() {
+            evaluate(SystemClock.elapsedRealtime())
+            handler.postDelayed(this, TICK_MS)
         }
-        sensorManager.registerListener(this, lightSensor, SensorManager.SENSOR_DELAY_NORMAL)
-        running = true
-        Timber.d("AmbientLightSensor: started")
     }
 
-    fun stop() {
-        if (!running) return
-        sensorManager.unregisterListener(this)
-        luxBuffer.clear()
-        running = false
-        Timber.d("AmbientLightSensor: stopped")
+    /** Start or stop listening and evaluating (any thread). Stopping resets the zone to day. */
+    fun setActive(on: Boolean) {
+        handler.post { applyActive(on) }
+    }
+
+    private fun applyActive(on: Boolean) {
+        if (on == active) return
+        if (on) {
+            if (lightSensor == null) {
+                Timber.w("AmbientLightSensor: no light sensor on this device")
+                _live.value = "kein Lichtsensor vorhanden"
+                return
+            }
+            // On-change sensors deliver the current value right after registering.
+            sensorManager.registerListener(this, lightSensor, SensorManager.SENSOR_DELAY_NORMAL)
+            handler.post(tick)
+            active = true
+            Timber.d("AmbientLightSensor: started")
+        } else {
+            sensorManager.unregisterListener(this)
+            handler.removeCallbacks(tick)
+            active = false
+            lastLux = null
+            darkSinceMs = null
+            brightSinceMs = null
+            _currentLightZone.value = Zone.DAY
+            _live.value = "aus"
+            Timber.d("AmbientLightSensor: stopped")
+        }
     }
 
     override fun onSensorChanged(event: SensorEvent) {
         val lux = event.values[0]
+        lastLux = lux
+        _currentLux.value = lux
+    }
 
-        // Update smoothing buffer
-        if (luxBuffer.size >= SMOOTHING_WINDOW_SIZE) {
-            luxBuffer.removeFirst()
+    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
+
+    private fun evaluate(now: Long) {
+        val lux = lastLux
+        if (lux == null) {
+            _live.value = "warte auf ersten Sensorwert"
+            return
         }
-        luxBuffer.addLast(lux)
-
-        val smoothedLux = luxBuffer.average().toFloat()
-        _currentLux.value = smoothedLux
-
-        // Categorize with hysteresis (dwell time)
-        val newZone = categorize(smoothedLux)
-        val currentZone = _currentLightZone.value
-        val now = System.currentTimeMillis()
-
-        if (newZone != currentZone) {
-            // NIGHT→DAY is held off longer so brief bright patches (e.g. gaps in a
-            // tree-lined avenue) don't flip the zone back; DAY→NIGHT stays responsive.
-            val required = if (currentZone == DayTimeZone.NIGHT && newZone == DayTimeZone.DAY) {
-                DAY_LOCKOUT_MS
+        val zone = _currentLightZone.value
+        var detail = ""
+        if (zone == Zone.DAY) {
+            brightSinceMs = null
+            if (lux < onBelowLux) {
+                val since = darkSinceMs ?: now.also { darkSinceMs = it }
+                val left = onDelayMs - (now - since)
+                if (left <= 0) {
+                    switchTo(Zone.NIGHT, lux)
+                    detail = ""
+                } else {
+                    detail = " · dunkel seit ${sec(now - since)} → Nacht in ${sec(left)}"
+                }
             } else {
-                MIN_DWELL_TIME_MS
+                darkSinceMs = null
             }
-            if ((now - lastZoneChangeTime) >= required) {
-                Timber.d("AmbientLightSensor: zone change $currentZone → $newZone (lux=$smoothedLux)")
-                _currentLightZone.value = newZone
-                lastZoneChangeTime = now
+        } else {
+            darkSinceMs = null
+            if (lux > offAboveLux) {
+                val since = brightSinceMs ?: now.also { brightSinceMs = it }
+                val left = offDelayMs - (now - since)
+                if (left <= 0) {
+                    switchTo(Zone.DAY, lux)
+                    detail = ""
+                } else {
+                    detail = " · hell seit ${sec(now - since)} → Tag in ${sec(left)}"
+                }
+            } else {
+                brightSinceMs = null
             }
         }
+        val shown = if (_currentLightZone.value == Zone.NIGHT) "Nacht" else "Tag"
+        _live.value = "%.0f lx · %s%s".format(Locale.GERMANY, lux, shown, detail)
     }
 
-    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
-        // not used
+    private fun switchTo(zone: Zone, lux: Float) {
+        Timber.d("AmbientLightSensor: zone ${_currentLightZone.value} → $zone (%.0f lx)".format(Locale.US, lux))
+        _currentLightZone.value = zone
+        darkSinceMs = null
+        brightSinceMs = null
     }
 
-    private fun categorize(lux: Float): DayTimeZone {
-        return if (lux < nightThreshold) DayTimeZone.NIGHT else DayTimeZone.DAY
+    private fun sec(ms: Long) = "%.1f s".format(Locale.GERMANY, ms / 1000.0)
+
+    companion object {
+        const val TICK_MS = 250L
     }
 }
