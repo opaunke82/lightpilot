@@ -148,13 +148,19 @@ Die installierte Version steht ganz unten auf der Einstellungsseite von LightPil
 
 ## Menü der App
 
-Die Startseite zeigt oben den Status (Tag/Nacht, Modus, Radar, Lichter mit Akku) und darunter das
-Menü. Jeder Eintrag öffnet genau eine Seite; zurück geht es über die Kopfzeile oder die
-Zurück-Taste des Karoo.
+Oben steht immer die Reiterleiste **Licht | Bedienung | Werkzeuge**. Ohne aktiven Reiter
+zeigt die Startseite den Status: Tag/Nacht und Modus, rechts das Radar, darunter die Fahrt und
+je Licht eine Zeile mit Rolle (Front/Rück), Modus und Akku als farbigem Kästchen. Gefundene,
+noch nicht eingerichtete Lichter erscheinen als gelbe Zeile, die direkt zu „Lichter“ führt.
 
-| Gruppe | Menü |
+Ein Reiter blendet den Status aus und zeigt seine Einträge; derselbe Reiter noch einmal
+angetippt führt zurück zum Status. Die App öffnet sich in der zuletzt benutzten Ansicht.
+Jeder Eintrag öffnet genau eine Seite; zurück geht es über die Kopfzeile oder die
+Zurück-Taste des Karoo. Texte, die nicht in eine Zeile passen, laufen langsam durch.
+
+| Reiter | Einträge |
 | --- | --- |
-| Licht & Automatik | Lichter (Licht antippen klappt seine Einstellungen auf) · Tag & Nacht · Tunnelmodus · Radar · Pause & Fahrtende · Akku |
+| Licht | Lichter (Licht antippen klappt seine Einstellungen auf) · Tag & Nacht · Tunnelmodus · Radar · Pause & Fahrtende · Akku |
 | Bedienung | Datenfelder & Tasten (Datenfelder, Peloton, Frontlicht-Feld, Di2 über Ki2, SRAM AXS) |
 | Werkzeuge | Test & Simulation · Diagnose (Protokoll, Bremslicht-Messung, Latenztest) · Info & Zurücksetzen |
 

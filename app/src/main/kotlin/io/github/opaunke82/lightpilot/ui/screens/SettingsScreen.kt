@@ -3,6 +3,14 @@
 
 package io.github.opaunke82.lightpilot.ui.screens
 
+import android.content.Context
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.basicMarquee
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -126,12 +134,27 @@ fun SettingsScreen(
     extensionReady: Boolean,
     actions: SettingsActions,
 ) {
+    // Start view (status) or one open tab; remembered across app starts (user's wish).
+    val context = LocalContext.current
+    val prefs = remember { context.getSharedPreferences("ui", Context.MODE_PRIVATE) }
+    var tabName by rememberSaveable { mutableStateOf(prefs.getString(KEY_TAB, null)) }
+    val tab = tabName?.let { name -> Tab.entries.firstOrNull { it.name == name } }
+    fun setTab(t: Tab?) {
+        tabName = t?.name
+        prefs.edit().putString(KEY_TAB, t?.name).apply()
+    }
     var page by rememberSaveable { mutableStateOf<String?>(null) }
     val current = page?.let { name -> Page.entries.firstOrNull { it.name == name } }
-    BackHandler(enabled = current != null) { page = null }
+    BackHandler(enabled = current != null || tab != null) {
+        if (current != null) page = null else setTab(null)
+    }
 
     if (current == null) {
-        HomePage(settings, discoveredLights, status, ki2State, sunrise, sunset, extensionReady) { page = it.name }
+        HomePage(
+            settings, discoveredLights, status, ki2State, sunrise, sunset, extensionReady, tab,
+            selectTab = { t -> setTab(if (t == tab) null else t) },
+            open = { p -> setTab(p.tab); page = p.name },
+        )
         return
     }
 
@@ -146,7 +169,7 @@ fun SettingsScreen(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text("‹", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(end = 12.dp))
-            Text(current.title, style = MaterialTheme.typography.titleLarge, maxLines = 1, softWrap = false)
+            Text(current.title, style = MaterialTheme.typography.titleLarge, maxLines = 1, modifier = Modifier.slowMarquee())
         }
         Column(
             modifier = Modifier
@@ -176,19 +199,37 @@ fun SettingsScreen(
     }
 }
 
-/** Entries of the start page; each opens exactly one page. */
-private enum class Page(val title: String, val group: String) {
-    LIGHTS("Lichter", "Licht & Automatik"),
-    DAY_NIGHT("Tag & Nacht", "Licht & Automatik"),
-    TUNNEL("Tunnelmodus", "Licht & Automatik"),
-    RADAR("Radar", "Licht & Automatik"),
-    PAUSE("Pause & Fahrtende", "Licht & Automatik"),
-    BATTERY("Akku", "Licht & Automatik"),
-    CONTROLS("Datenfelder & Tasten", "Bedienung"),
-    TEST("Test & Simulation", "Werkzeuge"),
-    DIAGNOSE("Diagnose", "Werkzeuge"),
-    INFO("Info & Zurücksetzen", "Werkzeuge"),
+private const val KEY_TAB = "tab"
+
+/** Tabs of the start page; tapping the open tab again shows the status. */
+private enum class Tab(val label: String) {
+    LIGHT("Licht"),
+    CONTROLS("Bedienung"),
+    TOOLS("Werkzeuge"),
 }
+
+/** Entries of a tab; each opens exactly one page. */
+private enum class Page(val title: String, val tab: Tab) {
+    LIGHTS("Lichter", Tab.LIGHT),
+    DAY_NIGHT("Tag & Nacht", Tab.LIGHT),
+    TUNNEL("Tunnelmodus", Tab.LIGHT),
+    RADAR("Radar", Tab.LIGHT),
+    PAUSE("Pause & Fahrtende", Tab.LIGHT),
+    BATTERY("Akku", Tab.LIGHT),
+    CONTROLS("Datenfelder & Tasten", Tab.CONTROLS),
+    TEST("Test & Simulation", Tab.TOOLS),
+    DIAGNOSE("Diagnose", Tab.TOOLS),
+    INFO("Info & Zurücksetzen", Tab.TOOLS),
+}
+
+/** Slow ticker for single-line texts; it only moves when the text does not fit. */
+@OptIn(ExperimentalFoundationApi::class)
+internal fun Modifier.slowMarquee(): Modifier = basicMarquee(
+    iterations = Int.MAX_VALUE,
+    repeatDelayMillis = 2000,
+    initialDelayMillis = 2000,
+    velocity = 20.dp,
+)
 
 @Composable
 private fun HomePage(
@@ -199,38 +240,69 @@ private fun HomePage(
     sunrise: Calendar?,
     sunset: Calendar?,
     extensionReady: Boolean,
+    tab: Tab?,
+    selectTab: (Tab) -> Unit,
     open: (Page) -> Unit,
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp)
-            .verticalScroll(rememberScrollState()),
-    ) {
+    Column(modifier = Modifier.fillMaxSize().padding(start = 16.dp, end = 16.dp, top = 16.dp)) {
         Text("LightPilot", style = MaterialTheme.typography.headlineSmall)
         if (!extensionReady) {
             Text("Warte auf den Karoo-Dienst …", color = MaterialTheme.colorScheme.error)
         }
         Spacer(Modifier.height(8.dp))
+        TabBar(tab, selectTab)
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.shapes.medium)
-                .padding(12.dp),
+                .weight(1f)
+                .verticalScroll(rememberScrollState()),
         ) {
-            StatusCard(status)
-        }
-
-        var lastGroup = ""
-        Page.entries.forEach { p ->
-            if (p.group != lastGroup) {
-                lastGroup = p.group
-                Spacer(Modifier.height(16.dp))
-                Text(p.group.uppercase(), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+            Spacer(Modifier.height(8.dp))
+            if (tab == null) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.shapes.medium)
+                        .padding(12.dp),
+                ) {
+                    StatusCard(status, settings, discovered) { open(Page.LIGHTS) }
+                }
+            } else {
+                Page.entries.filter { it.tab == tab }.forEach { p ->
+                    MenuRow(p.title, summaryOf(p, settings, discovered, status, ki2State, sunrise, sunset)) { open(p) }
+                }
             }
-            MenuRow(p.title, summaryOf(p, settings, discovered, status, ki2State, sunrise, sunset)) { open(p) }
+            Spacer(Modifier.height(16.dp))
         }
-        Spacer(Modifier.height(16.dp))
+    }
+}
+
+@Composable
+private fun TabBar(active: Tab?, select: (Tab) -> Unit) {
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        Tab.entries.forEach { t ->
+            val on = t == active
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .background(
+                        if (on) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                        MaterialTheme.shapes.small,
+                    )
+                    .clickable { select(t) }
+                    .padding(vertical = 10.dp, horizontal = 2.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    t.label,
+                    fontSize = 15.sp,
+                    fontWeight = if (on) FontWeight.Bold else FontWeight.Medium,
+                    color = if (on) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    softWrap = false,
+                )
+            }
+        }
     }
 }
 
@@ -245,8 +317,11 @@ private fun summaryOf(
 ): String = when (p) {
     Page.LIGHTS -> {
         val connected = status.lights.count { it.connected }
-        if (s.lights.isEmpty()) "noch keins eingerichtet (${discovered.size} gefunden)"
-        else "${s.lights.size} eingerichtet · $connected verbunden"
+        when {
+            s.lights.isNotEmpty() -> "${s.lights.size} eingerichtet · $connected verbunden"
+            discovered.isEmpty() -> "keins gefunden"
+            else -> "0 von ${discovered.size} eingerichtet"
+        }
     }
     Page.DAY_NIGHT -> if (s.useTimeBased) {
         "Tag ab ${hhmm(sunrise, s.dawnOffsetMinutes)} · Nacht ab ${hhmm(sunset, s.duskOffsetMinutes)}"
@@ -279,49 +354,156 @@ private fun MenuRow(title: String, summary: String, onClick: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.titleMedium, maxLines = 1, softWrap = false)
+            Text(title, style = MaterialTheme.typography.titleMedium, maxLines = 1, modifier = Modifier.slowMarquee())
             Text(
                 summary,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.slowMarquee(),
             )
         }
-        Text("›", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.primary)
+        Text("›", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(start = 8.dp))
     }
     HorizontalDivider()
 }
 
+private val ROLE_WIDTH = 52.dp
+private val NEW_LIGHT_BG = Color(0xFFFFF3C4)
+
 @Composable
-private fun StatusCard(s: EngineStatus) {
+private fun StatusCard(s: EngineStatus, settings: AppSettings, discovered: List<DiscoveredLight>, openLights: () -> Unit) {
+    val warnColor = Color(0xFFB71C1C)
     val radar = when {
         s.radarWarning -> "Fahrzeug!"
-        !s.radarSeen -> "Radar: –"
-        s.radarStale -> "Radar: alt"
+        !s.radarSeen -> "Radar –"
+        s.radarStale -> "Radar alt"
         else -> "Radar frei"
     }
-    val zone = zoneLabel(s.zone) + if (s.simZone != null) " (erzwungen)" else ""
-    Text(
-        "$zone · ${manualLabel(s.manual)} · $radar",
-        style = MaterialTheme.typography.titleMedium,
-        color = if (s.radarWarning) Color(0xFFB71C1C) else Color.Unspecified,
-    )
+    val manual = if (s.manual == ManualMode.AUTO) "Auto" else manualLabel(s.manual)
+    val zone = zoneLabel(s.zone) + if (s.simZone != null) " (Sim)" else ""
+    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            "$zone · $manual",
+            style = MaterialTheme.typography.titleMedium,
+            color = if (s.radarWarning) warnColor else Color.Unspecified,
+            maxLines = 1,
+            modifier = Modifier.weight(1f).slowMarquee(),
+        )
+        Text(
+            radar,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = if (s.radarWarning) FontWeight.Bold else null,
+            color = if (s.radarWarning) warnColor else Color.Unspecified,
+            maxLines = 1,
+            softWrap = false,
+            modifier = Modifier.padding(start = 8.dp),
+        )
+    }
     val pause = s.autoPauseOffInSec?.let { sec ->
         if (sec > 0) " · Licht aus in %d:%02d".format(sec / 60, sec % 60) else " · Licht aus"
     } ?: ""
-    Text(phaseLabel(s.phase) + pause + if (s.simulation) " · SIMULATION" else "", style = MaterialTheme.typography.bodyMedium)
-    s.lights.forEach { l ->
-        val mode = modeDisplayName(l.setup.protocol, l.setup.deviceId, l.desired)
-        val state = if (l.connected) "●" else "○"
-        Text(
-            withBatteryColor("$state ${l.setup.deviceName}: $mode", l.setup.protocol, l.batteryPct),
-            style = MaterialTheme.typography.bodyMedium,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
+    Text(
+        phaseLabel(s.phase) + pause + if (s.simulation) " · SIM" else "",
+        style = MaterialTheme.typography.bodyMedium,
+        maxLines = 1,
+        modifier = Modifier.slowMarquee(),
+    )
+
+    val configuredIds = settings.lights.map { it.deviceId }.toSet()
+    val newCount = discovered.count { it.id !in configuredIds }
+    if (s.lights.isNotEmpty() || newCount > 0 || settings.lights.isEmpty()) {
+        HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp))
     }
-    if (s.lights.isEmpty()) Note("Noch kein Licht eingerichtet (Menü „Lichter“).")
+    s.lights.forEachIndexed { index, l ->
+        val sameRole = s.lights.filter { it.setup.role == l.setup.role }
+        val role = (if (l.setup.role == LightRole.FRONT) "Front" else "Rück") +
+            if (sameRole.size > 1) " ${sameRole.indexOf(l) + 1}" else ""
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                if (l.connected) "●" else "○",
+                style = MaterialTheme.typography.bodyMedium,
+                color = if (l.connected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(end = 6.dp),
+            )
+            Text(
+                role,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                softWrap = false,
+                modifier = Modifier.width(ROLE_WIDTH),
+            )
+            Text(
+                modeDisplayName(l.setup.protocol, l.setup.deviceId, l.desired),
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 1,
+                modifier = Modifier.weight(1f).padding(horizontal = 4.dp).slowMarquee(),
+            )
+            BatteryBadge(l.setup.protocol, l.batteryPct)
+        }
+        if (index == s.lights.lastIndex && newCount > 0) Spacer(Modifier.height(4.dp))
+    }
+    when {
+        newCount > 0 -> {
+            val text = when {
+                settings.lights.isEmpty() -> if (newCount == 1) "1 Licht gefunden" else "$newCount Lichter gefunden"
+                else -> if (newCount == 1) "1 weiteres gefunden" else "$newCount weitere gefunden"
+            }
+            NewLightsRow("$text · einrichten ›", NEW_LIGHT_BG, openLights)
+        }
+        settings.lights.isEmpty() -> NewLightsRow("Kein Licht gefunden · Lichter ›", Color.Transparent, openLights)
+    }
+}
+
+@Composable
+private fun NewLightsRow(text: String, bg: Color, onClick: () -> Unit) {
+    Text(
+        text,
+        style = MaterialTheme.typography.bodyMedium,
+        fontWeight = FontWeight.Medium,
+        color = if (bg == Color.Transparent) MaterialTheme.colorScheme.onSurfaceVariant else Color(0xFF3E2E00),
+        maxLines = 1,
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(bg, MaterialTheme.shapes.small)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 6.dp, vertical = 6.dp)
+            .slowMarquee(),
+    )
+}
+
+/** Battery as a coloured box: percent for Magicshine, class for the Varia. */
+@Composable
+private fun BatteryBadge(protocol: LightProtocol, pct: Int?) {
+    val text = when {
+        pct == null -> "–"
+        protocol == LightProtocol.BLE -> "$pct %"
+        pct >= 100 -> "neu"
+        pct >= 80 -> "gut"
+        pct >= 50 -> "ok"
+        pct >= 20 -> "niedrig"
+        else -> "kritisch"
+    }
+    val bg = batteryColor(protocol, pct)?.let { Color(it) } ?: MaterialTheme.colorScheme.surface
+    val fg = if (pct == null) MaterialTheme.colorScheme.onSurfaceVariant
+    else if (bg.luminance() > 0.5f) Color.Black else Color.White
+    Text(
+        text,
+        style = MaterialTheme.typography.bodySmall,
+        fontWeight = FontWeight.Bold,
+        color = fg,
+        maxLines = 1,
+        softWrap = false,
+        textAlign = TextAlign.Center,
+        modifier = Modifier
+            .background(bg, MaterialTheme.shapes.small)
+            .padding(horizontal = 6.dp, vertical = 2.dp),
+    )
 }
 
 @Composable
@@ -339,7 +521,7 @@ private fun LightsPage(
     // The unfolded light is drawn inside the list (see LightList).
     Spacer(Modifier.height(12.dp))
     OutlinedButton(onClick = actions.rescanBle, modifier = Modifier.fillMaxWidth()) {
-        Text("Bluetooth-Lichter suchen", maxLines = 1, softWrap = false)
+        Text("Bluetooth-Lichter suchen", maxLines = 1, modifier = Modifier.slowMarquee())
     }
     Note(
         if (bleScanning) {
@@ -443,7 +625,7 @@ private fun DiagnosePage(brakeDiag: String, exportInfo: String?, actions: Settin
     SubHeader("Protokoll")
     LogPanel(height = 320.dp)
     OutlinedButton(onClick = actions.exportLog, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
-        Text("Protokoll exportieren", maxLines = 1, softWrap = false)
+        Text("Protokoll exportieren", maxLines = 1, modifier = Modifier.slowMarquee())
     }
     exportInfo?.let { Note("Gespeichert: $it") }
 
@@ -455,7 +637,7 @@ private fun DiagnosePage(brakeDiag: String, exportInfo: String?, actions: Settin
     SwitchRow("Aufzeichnen", brakeDiag.startsWith("läuft")) { actions.brakeRecording(it) }
     Note(brakeDiag)
     OutlinedButton(onClick = actions.latencyTest, modifier = Modifier.fillMaxWidth()) {
-        Text("Latenztest Rücklicht", maxLines = 1, softWrap = false)
+        Text("Latenztest Rücklicht", maxLines = 1, modifier = Modifier.slowMarquee())
     }
     Note(
         "Ohne Fahrt: 10× Dauerlicht hell und Aus im Abstand von 3 s, mit Piepton beim Senden " +
