@@ -581,7 +581,7 @@ private fun LightList(
         val role = when (setup?.role) {
             LightRole.FRONT -> "Front"
             LightRole.REAR -> "Rück"
-            null -> "antippen zum Einrichten"
+            null -> ""
         }
         val protocol = if (light.protocol == LightProtocol.BLE) "Bluetooth" else "ANT+"
         val info = withBatteryColor(
@@ -598,16 +598,22 @@ private fun LightList(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            // Name, info and role stacked; only the small arrow sits on the right, so the text
+            // always keeps the full width (a long role label squeezed the name, 24.11.2026).
             Column(modifier = Modifier.weight(1f)) {
-                Text(light.name)
+                Text(light.name, style = MaterialTheme.typography.titleMedium)
                 Text(info, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    if (setup == null) "Antippen zum Einrichten" else "Rolle: $role",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                )
             }
             Text(
-                role + if (openId == light.id) "  ▲" else "  ▼",
-                style = MaterialTheme.typography.bodyMedium,
+                if (openId == light.id) "▲" else "▼",
+                style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.primary,
-                maxLines = 1,
-                softWrap = false,
+                modifier = Modifier.padding(start = 8.dp),
             )
         }
         if (openId == light.id) {
