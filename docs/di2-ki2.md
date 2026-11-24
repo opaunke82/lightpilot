@@ -40,7 +40,7 @@ eine **Druckart**, die Ki2 nicht nutzt.
 
 1. Ki2 → **Settings** → **Switches**.
 2. Unter **D-Fly Ch. 1** und **D-Fly Ch. 2** die Druckart, die LightPilot bekommen soll, auf
-   **No Action** stellen. Empfehlung: **Double Press**.
+   **None** stellen. Empfehlung: **Double Press**.
 3. **Single Press** (z. B. Seite wechseln) und **Hold** können in Ki2 bleiben, wie sie sind.
 
 ### 4. LightPilot einrichten (Karoo, LightPilot)
@@ -57,7 +57,7 @@ eine **Druckart**, die Ki2 nicht nutzt.
    | rechts (Kanal 2) | Doppelt | Frontlicht: nächste Helligkeit |
 
    Möglich sind außerdem **Licht: Automatik / Peloton / An / Aus / Hart aus** und **Keine**.
-   Die Zuordnung in LightPilot muss zu der Druckart passen, die du in Ki2 auf **No Action** gestellt hast.
+   Die Zuordnung in LightPilot muss zu der Druckart passen, die du in Ki2 auf **None** gestellt hast.
 5. Seite schließen. Die Einstellungen sind sofort gespeichert.
 
 ### 5. Testen
@@ -76,7 +76,7 @@ eine **Druckart**, die Ki2 nicht nutzt.
 | Status **Ki2-Version passt nicht** | Ki2 hat seine Schnittstelle geändert. LightPilot muss angepasst werden, bitte melden. |
 | **Letzte Taste** bleibt „–“ | Di2 nicht mit Ki2 verbunden oder Hood-Taste hat keinen D-Fly-Kanal (Schritt 1). In Ki2 unter **D-Fly Channel Status** prüfen. |
 | Taste wird angezeigt, aber nichts passiert | Keine Aktion für diesen Kanal und diese Druckart gewählt, oder keine Fahrt aktiv. |
-| Ki2 und LightPilot reagieren beide | Die Druckart steht in Ki2 noch nicht auf **No Action** (Schritt 3). |
+| Ki2 und LightPilot reagieren beide | Die Druckart steht in Ki2 noch nicht auf **None** (Schritt 3). |
 
 ## SRAM AXS
 

@@ -69,7 +69,7 @@ fun Di2Screen(
                     "Ki2 hält die Verbindung zur Di2, LightPilot hört nur mit. Welche Taste welchen D-Fly-Kanal " +
                         "sendet, legst du in der Shimano E-Tube-App fest. Drück eine Taste und lies oben ab, welcher " +
                         "Kanal ankommt. Damit eine Druckart nicht zusätzlich in Ki2 etwas auslöst, stell sie in Ki2 " +
-                        "auf „No Action“ (z. B. Doppelt), und belege sie hier.",
+                        "auf „None“ (z. B. Doppelt), und belege sie hier.",
                 )
                 if (settings.di2Enabled) {
                     (1..4).forEach { channel ->

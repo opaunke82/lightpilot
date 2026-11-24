@@ -55,7 +55,7 @@ Release-Notes unter **Releases**, gegliedert in New, Update und Fix.
   hört bei der Extension Ki2 mit, die die Verbindung zur Di2 hält, und bekommt die Tasten als
   D-Fly-Kanal 1–4 mit Druckart (einfach, doppelt, halten). Jede Kombination lässt sich mit einer
   der drei LightPilot-Aktionen belegen. Damit Ki2 nicht zusätzlich reagiert, die Druckart in Ki2
-  auf „No Action“ stellen. SRAM AXS braucht das nicht: Bonus Buttons und Blips lassen sich am
+  auf „None“ stellen. SRAM AXS braucht das nicht: Bonus Buttons und Blips lassen sich am
   Karoo unter „Sensoren“ → AXS → „Configure Controls“ direkt mit LightPilot-Aktionen belegen.
   Schritt-für-Schritt-Anleitung: [docs/di2-ki2.md](docs/di2-ki2.md).
 - **Werkseinstellungen:** setzt Lichter-Zuordnung, Einstellungen, gespeicherte Position und
