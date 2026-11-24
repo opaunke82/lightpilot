@@ -52,8 +52,9 @@ import io.github.opaunke82.lightpilot.data.modeProviderFor
 
 private const val NO_SAVER = "__none__"
 
+/** Settings of one light, shown unfolded below its row on the "Lichter" page. */
 @Composable
-fun LightDetailDialog(
+fun LightDetailPanel(
     light: DiscoveredLight,
     setup: LightSetup?,
     onUpdate: (LightSetup?) -> Unit,
@@ -78,17 +79,9 @@ fun LightDetailDialog(
         )
     }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        confirmButton = { TextButton(onClick = onDismiss) { Text("Schließen") } },
-        dismissButton = if (setup != null) {
-            { TextButton(onClick = { confirmForget = true }) { Text("Entfernen", color = MaterialTheme.colorScheme.error) } }
-        } else {
-            null
-        },
-        title = { Text(light.name, style = MaterialTheme.typography.titleMedium) },
-        text = {
-            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+    run {
+        run {
+            Column(modifier = Modifier.fillMaxWidth().padding(start = 8.dp, end = 4.dp, bottom = 8.dp)) {
                 val protocol = if (light.protocol == LightProtocol.BLE) "Bluetooth" else "ANT+"
                 Text(
                     withBatteryColor(
@@ -210,9 +203,14 @@ fun LightDetailDialog(
                         }
                     }
                 }
+                if (setup != null) {
+                    OutlinedButton(onClick = { confirmForget = true }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+                        Text("Licht entfernen", color = MaterialTheme.colorScheme.error, maxLines = 1)
+                    }
+                }
             }
-        },
-    )
+        }
+    }
 }
 
 private const val CUSTOM = "__custom__"

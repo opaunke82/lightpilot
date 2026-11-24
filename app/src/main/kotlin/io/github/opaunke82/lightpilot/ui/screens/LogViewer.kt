@@ -4,7 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -26,6 +26,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -36,8 +37,8 @@ import kotlinx.coroutines.delay
 /** Filters by the text a log line contains (the tag is part of the message). */
 private enum class LogFilter(val label: String, val match: String?) {
     ALL("Alle", null),
-    ENGINE("Steuerung", "Engine"),
-    BLE("Magicshine", "Magicshine"),
+    ENGINE("Logik", "Engine"),
+    BLE("BLE", "Magicshine"),
     SYSTEM("System", "LightPilot"),
 }
 
@@ -46,7 +47,7 @@ private enum class LogFilter(val label: String, val match: String?) {
  * the newest lines once per second, and only if something new was logged.
  */
 @Composable
-fun LogViewer(onClose: () -> Unit) {
+fun LogPanel(height: Dp) {
     var filter by remember { mutableStateOf(LogFilter.ALL) }
     var paused by remember { mutableStateOf(false) }
     var lines by remember { mutableStateOf(EventLog.snapshot(MAX_SHOWN)) }
@@ -69,46 +70,35 @@ fun LogViewer(onClose: () -> Unit) {
         if (m == null) lines else lines.filter { it.contains(m) }
     }
 
-    Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Surface(modifier = Modifier.fillMaxSize()) {
-            Column(modifier = Modifier.padding(8.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text("Protokoll", style = MaterialTheme.typography.titleMedium)
-                    TextButton(onClick = onClose) { Text("Schließen") }
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    LogFilter.entries.forEach { f ->
-                        SmallChoice(f.label, filter == f, Modifier.weight(1f)) { filter = f }
-                    }
-                }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        "${shown.size} Zeilen, neueste oben" + if (paused) " · angehalten" else "",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    TextButton(onClick = { paused = !paused }) { Text(if (paused) "Weiter" else "Anhalten") }
-                }
-                HorizontalDivider()
-                LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
-                    items(shown) { line ->
-                        Text(
-                            line,
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 10.sp,
-                            lineHeight = 12.sp,
-                            modifier = Modifier.padding(vertical = 2.dp),
-                        )
-                    }
-                }
+    Column {
+        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            LogFilter.entries.forEach { f ->
+                SmallChoice(f.label, filter == f, Modifier.weight(1f)) { filter = f }
+            }
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                "${shown.size} Zeilen, neueste oben" + if (paused) " · angehalten" else "",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+            )
+            TextButton(onClick = { paused = !paused }) { Text(if (paused) "Weiter" else "Anhalten", maxLines = 1) }
+        }
+        HorizontalDivider()
+        LazyColumn(state = listState, modifier = Modifier.fillMaxWidth().height(height)) {
+            items(shown) { line ->
+                Text(
+                    line,
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 11.sp,
+                    lineHeight = 13.sp,
+                    modifier = Modifier.padding(vertical = 2.dp),
+                )
             }
         }
     }
@@ -117,9 +107,9 @@ fun LogViewer(onClose: () -> Unit) {
 @Composable
 private fun SmallChoice(text: String, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
     if (selected) {
-        Button(onClick = onClick, modifier = modifier, contentPadding = TIGHT) { Text(text, fontSize = 11.sp, maxLines = 1) }
+        Button(onClick = onClick, modifier = modifier, contentPadding = TIGHT) { Text(text, fontSize = 13.sp, maxLines = 1, softWrap = false) }
     } else {
-        OutlinedButton(onClick = onClick, modifier = modifier, contentPadding = TIGHT) { Text(text, fontSize = 11.sp, maxLines = 1) }
+        OutlinedButton(onClick = onClick, modifier = modifier, contentPadding = TIGHT) { Text(text, fontSize = 13.sp, maxLines = 1, softWrap = false) }
     }
 }
 

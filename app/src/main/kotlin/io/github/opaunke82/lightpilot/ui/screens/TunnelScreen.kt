@@ -29,25 +29,16 @@ import androidx.compose.ui.window.DialogProperties
 import io.github.opaunke82.lightpilot.data.AppSettings
 import kotlin.math.roundToInt
 
-/** Separate page: tunnel mode (ambient light sensor) with thresholds and times. */
+/** Page "Tunnelmodus": ambient light sensor with thresholds, times and live state. */
 @Composable
-fun TunnelScreen(
+fun TunnelContent(
     settings: AppSettings,
     live: String,
     save: (AppSettings) -> Unit,
-    onClose: () -> Unit,
 ) {
-    Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Surface(modifier = Modifier.fillMaxSize()) {
-            Column(modifier = Modifier.padding(12.dp).verticalScroll(rememberScrollState())) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text("Tunnelmodus", style = MaterialTheme.typography.titleMedium)
-                    TextButton(onClick = onClose) { Text("Schließen") }
-                }
+    run {
+        run {
+            Column {
                 Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text("Tunnelmodus verwenden", modifier = Modifier.weight(1f))
                     Switch(checked = settings.tunnelEnabled, onCheckedChange = { save(settings.copy(tunnelEnabled = it)) })
@@ -57,7 +48,8 @@ fun TunnelScreen(
                         "Zusammen mit den Sonnenzeiten kann er nur auf Nacht schalten, nie auf Tag.",
                 )
                 if (settings.tunnelEnabled) {
-                    Hint("Jetzt: $live")
+                    Text("Jetzt: $live", style = MaterialTheme.typography.bodyLarge)
+                    Hint("Test: Karoo mit einem Buch abdecken (→ Nacht) oder mit einer Taschenlampe anleuchten (→ Tag).")
                     Spacer(Modifier.height(12.dp))
                     StepSlider("Licht an unter", settings.tunnelOnBelowLux, 10..2000, 10, "lx") {
                         val on = it
@@ -81,7 +73,6 @@ fun TunnelScreen(
                             "Dazwischen bleibt der Zustand (Hysterese). Richtwerte: beleuchteter Tunnel 50–300 lx, " +
                             "dichter Wald 500–2000 lx, bedeckter Tag über 1000 lx.",
                     )
-                    Hint("Live-Anzeige auch unter „Test und Diagnose“.")
                 }
             }
         }

@@ -36,26 +36,17 @@ fun ki2StateLabel(state: Ki2Bridge.State): String = when (state) {
     Ki2Bridge.State.INCOMPATIBLE -> "Ki2-Version passt nicht (Schnittstelle geändert)"
 }
 
-/** Separate page: Shimano Di2 hood buttons through Ki2. */
+/** Shimano Di2 hood buttons through Ki2 (part of the page "Datenfelder & Tasten"). */
 @Composable
-fun Di2Screen(
+fun Di2Content(
     settings: AppSettings,
     state: Ki2Bridge.State,
     lastButton: String?,
     save: (AppSettings) -> Unit,
-    onClose: () -> Unit,
 ) {
-    Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Surface(modifier = Modifier.fillMaxSize()) {
-            Column(modifier = Modifier.padding(12.dp).verticalScroll(rememberScrollState())) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text("Di2-Tasten (Ki2)", style = MaterialTheme.typography.titleMedium)
-                    TextButton(onClick = onClose) { Text("Schließen") }
-                }
+    run {
+        run {
+            Column {
                 Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text("Di2-Tasten verwenden", modifier = Modifier.weight(1f))
                     Switch(checked = settings.di2Enabled, onCheckedChange = { save(settings.copy(di2Enabled = it)) })
