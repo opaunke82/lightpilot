@@ -6,7 +6,7 @@ genug ist. Standard: **aus**.
 
 ## Einstellen
 
-LightPilot → **Tag und Nacht** → **Tunnelmodus öffnen**:
+LightPilot → Menü **Tunnelmodus**:
 
 | Einstellung | Standard | Bereich | Bedeutung |
 | --- | --- | --- | --- |
@@ -59,7 +59,7 @@ Soll das Licht schon in lichtem Wald angehen, „Licht an unter“ erhöhen (z. 
 ## Testen
 
 1. Tunnelmodus einschalten.
-2. **Test und Diagnose** → **Tunnelmodus live** zeigt den aktuellen Wert und den Zustand, z. B.
+2. Die Zeile **Jetzt:** im Menü **Tunnelmodus** (auch unter **Test & Simulation**) zeigt den aktuellen Wert und den Zustand, z. B.
    `212 lx · Tag · dunkel seit 1,2 s → Nacht in 0,8 s`.
 3. Karoo mit einem Buch abdecken: nach der Zeit „Dunkel für“ steht dort **Nacht**.
 4. Buch weg oder mit einer Taschenlampe anleuchten: nach der Zeit „Hell für“ steht dort **Tag**.

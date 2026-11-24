@@ -17,8 +17,7 @@ Release-Notes unter **Releases**, gegliedert in New, Update und Fix.
   berechnet.
 - **Tunnelmodus (optional, Standard aus):** Der Lichtsensor des Karoo schaltet in Tunnel und Wald
   auf Nacht: Nacht, wenn es 2 s lang dunkler als 300 lx ist, Tag, wenn es 10 s lang heller als
-  600 lx ist (alles einstellbar, eigene Seite unter „Tag und Nacht“, Live-Anzeige unter „Test und
-  Diagnose“). Ausführlich: [docs/tunnelmodus.md](docs/tunnelmodus.md).
+  600 lx ist (alles einstellbar, Menü „Tunnelmodus“ mit Live-Anzeige). Ausführlich: [docs/tunnelmodus.md](docs/tunnelmodus.md).
 - **Haltezeit:** Nach dem letzten Fahrzeug bleibt die Warnung 3 s an (einstellbar 0–10 s).
 - **Watchdog:** Kommen 5 s lang keine Radardaten, endet die Warnung. Nichts bleibt hängen.
 - **Statusfeld:** Tippen schaltet reihum Automatik → Peloton → An → Aus → Hart aus.
@@ -36,7 +35,7 @@ Release-Notes unter **Releases**, gegliedert in New, Update und Fix.
   Stufe. Ist die Lampe aus, wird nur vorgewählt.
 - **Frontlicht-Feld:** Tippen schaltet durch die beim Licht angehakten Stufen des aktiven Lichts
   (Standard: Abblend 30/60/100, Fernlicht 50/100), optional mit Aus.
-  Pausenregel (Standard 5 s, einstellbar 0–10 s unter „Lichter“): Der erste Tipp nach einer Pause
+  Pausenregel (Standard 5 s, einstellbar 0–10 s unter „Datenfelder & Tasten“): Der erste Tipp nach einer Pause
   schaltet eine leuchtende Lampe aus, eine ausgeschaltete auf die kleinste angehakte Stufe; danach
   beginnt der Zyklus wieder von unten. Eine gewählte Stufe bleibt beim Wechsel zwischen Automatik
   und Peloton erhalten.
@@ -55,7 +54,7 @@ Release-Notes unter **Releases**, gegliedert in New, Update und Fix.
   für das Licht selbst keinen Zustand). Die Magicshine meldet weder Tastendrücke noch ihre
   aktuelle Stufe; angezeigt wird die zuletzt gesendete. Akku farbig: grün (Magicshine 100–50 %,
   Varia neu/gut), gelb (49–20 %, Varia ok), rot (darunter, Varia niedrig/kritisch).
-- **Shimano-Di2-Tasten (über Ki2):** eigene Seite „Di2-Tasten (Ki2)“, Standard aus. LightPilot
+- **Shimano-Di2-Tasten (über Ki2):** im Menü „Datenfelder & Tasten“, Standard aus. LightPilot
   hört bei der Extension Ki2 mit, die die Verbindung zur Di2 hält, und bekommt die Tasten als
   D-Fly-Kanal 1–4 mit Druckart (einfach, doppelt, halten). Jede Kombination lässt sich mit einer
   der drei LightPilot-Aktionen belegen. Damit Ki2 nicht zusätzlich reagiert, die Druckart in Ki2
@@ -141,11 +140,23 @@ Die installierte Version steht ganz unten auf der Einstellungsseite von LightPil
 3. Andere Licht-Extensions (KarooFirefly, LightONKaroo) deinstallieren oder beenden.
 4. Magicshine einschalten. Sie darf nicht mit der Magicshine-App auf einem Handy verbunden sein,
    sonst ist sie für den Karoo unsichtbar.
-5. LightPilot unter **Extensions** öffnen. Unter **Lichter** erscheinen die gefundenen Lichter gelb
+5. LightPilot unter **Extensions** öffnen, Menü **Lichter**. Dort erscheinen die gefundenen Lichter gelb
    („antippen zum Einrichten“); antippen und Rolle wählen (Varia: Rück, Magicshine: Front). Beim
    Frontlicht die Stufen für das Datenfeld wählen, bei der Magicshine getrennt für Abblend- und Fernlicht. Fehlt die Magicshine:
-   **Nach Bluetooth-Lichtern suchen**. Die Standardwerte entsprechen dem Anforderungsprotokoll.
+   **Bluetooth-Lichter suchen**. Die Standardwerte entsprechen dem Anforderungsprotokoll.
 6. Datenfelder **LightPilot**, **Frontlicht** und **Abblend/Fern** in ein Fahrprofil legen.
+
+## Menü der App
+
+Die Startseite zeigt oben den Status (Tag/Nacht, Modus, Radar, Lichter mit Akku) und darunter das
+Menü. Jeder Eintrag öffnet genau eine Seite; zurück geht es über die Kopfzeile oder die
+Zurück-Taste des Karoo.
+
+| Gruppe | Menü |
+| --- | --- |
+| Licht & Automatik | Lichter (Licht antippen klappt seine Einstellungen auf) · Tag & Nacht · Tunnelmodus · Radar · Pause & Fahrtende · Akku |
+| Bedienung | Datenfelder & Tasten (Datenfelder, Peloton, Frontlicht-Feld, Di2 über Ki2, SRAM AXS) |
+| Werkzeuge | Test & Simulation · Diagnose (Protokoll, Bremslicht-Messung, Latenztest) · Info & Zurücksetzen |
 
 ## Bedienung während der Fahrt
 
@@ -162,7 +173,7 @@ Außerhalb einer Fahrt reagieren die Felder nicht auf Tippen.
 
 ## Testen
 
-Im Abschnitt **Test und Diagnose** der App den Simulationsmodus einschalten. Er spielt die
+Im Menü **Test & Simulation** den Simulationsmodus einschalten. Er spielt die
 Abläufe am Tisch durch, das echte Radar wird dabei ignoriert:
 
 1. **Fahrt** starten und beenden
@@ -177,8 +188,8 @@ beschrieben (ausgewertet aus einem Mitschnitt der Magicshine-App).
 Die Varia meldet ihren neuen Modus etwa 0,4 s nach dem tatsächlichen Umschalten zurück; für
 Zeitmessungen taugt die Rückmeldung daher nicht.
 
-**Protokoll öffnen** zeigt die letzten 1000 Einträge im Vollbild, neueste oben, mit Filter
-(Alle, Steuerung, Magicshine, System) und Anhalten. **Exportieren** speichert das ganze
+Das Menü **Diagnose** zeigt die letzten 1000 Protokolleinträge, neueste oben, mit Filter
+(Alle, Logik, BLE, System) und Anhalten. **Exportieren** speichert das ganze
 Protokoll als Textdatei auf dem Karoo; am Rechner holen mit adb (unter Linux im Paket
 `android-tools`):
 
@@ -191,7 +202,7 @@ adb pull /sdcard/Android/data/io.github.opaunke82.lightpilot/files/
 - **Bremslicht:** in Prüfung. Der Karoo stellt Beschleunigungssensor, Gyroskop und lineare
   Beschleunigung für Apps bereit. Gemessen: Befehl bis Licht an der Varia etwa 0,1–0,35 s
   (Latenztest mit Video). Offen: Erkennungszeit und Fehlauslösungen aus einer Bremsfahrt
-  (Bremslicht-Messung unter „Test und Diagnose“). Grenze: insgesamt höchstens 0,5 s.
+  (Bremslicht-Messung im Menü „Diagnose“). Grenze: insgesamt höchstens 0,5 s.
 - **Varia ohne Radar:** Die Verbindung der Varia wird über ihr Radar erkannt. Ist das Radar am
   Karoo abgeschaltet und nur das Licht in Betrieb, zeigt die App sie als „nicht verbunden“.
 - **Inoffizielle Schnittstelle:** Das Schalten der ANT+-Lichter nutzt eine nicht dokumentierte
