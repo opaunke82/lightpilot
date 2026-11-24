@@ -57,6 +57,7 @@ Release-Notes unter **Releases**, gegliedert in New, Update und Fix.
   der drei LightPilot-Aktionen belegen. Damit Ki2 nicht zusätzlich reagiert, die Druckart in Ki2
   auf „No Action“ stellen. SRAM AXS braucht das nicht: Bonus Buttons und Blips lassen sich am
   Karoo unter „Sensoren“ → AXS → „Configure Controls“ direkt mit LightPilot-Aktionen belegen.
+  Schritt-für-Schritt-Anleitung: [docs/di2-ki2.md](docs/di2-ki2.md).
 - **Werkseinstellungen:** setzt Lichter-Zuordnung, Einstellungen, gespeicherte Position und
   Protokoll zurück (mit Bestätigungsabfrage). Die Kopplung im Karoo bleibt.
 
