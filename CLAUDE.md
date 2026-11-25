@@ -124,3 +124,4 @@
 - README, `docs/` und Menüpfade bei jeder Änderung aktuell halten, offene Punkte im README pflegen.
 - Ursachen erklären, nicht nur Symptome beheben.
 - Keine Zugangsdaten in Code, Docs, Commits oder Memory.
+- Keine persönlichen Daten (Namen, Adressen, Kontaktdaten, Standorte o. Ä.) in Dateien, Commits, PRs oder Releases – außer der Maintainer gibt sie ausdrücklich frei.
